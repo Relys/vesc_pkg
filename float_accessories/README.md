@@ -22,6 +22,6 @@ LED functionality only. Requires 6.05 firmware on both the VESC and VESC Express
 
 <H3>BUILD INFO</H3>
 
-Version 1.0
+Version 1.1
 
 Source code can be found here:  <a href='https://github.com/relys/vesc%5Fpkg'>https://github.com/relys/vesc_pkg</a>

@@ -1,4 +1,4 @@
-@const-symbol-strings
+;@const-symbol-strings
 
 @const-start
 (def wifi-enabled-on-boot nil)

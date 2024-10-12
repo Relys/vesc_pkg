@@ -1,4 +1,4 @@
-@const-symbol-strings
+;@const-symbol-strings
 @const-start
 (def rainbow-colors '(0xFF0000u32 0xFFFF00u32 0x00FF00u32 0x00FFFFu32 0x0000FFu32 0xFF00FFu32))
 (def rave-colors '(0x00FFFF00 0x0000FF00 0x0000FFFF 0x000000FF 0x00FF00FF 0x00FF0000))

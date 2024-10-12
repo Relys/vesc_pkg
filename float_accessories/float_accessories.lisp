@@ -1,6 +1,6 @@
 ; float-accessories.lisp
 ; Smart LED Control, Tilt Remote and stock OW BMS bridge for VESC Express
-; Version 1.0
+; Version 1.1
 ; 4/7/2024
 ; Copyright 2024 Syler Clayton <syler.clayton@gmail.com>
 ; Special Thanks: Benjamin Vedder, surfdado, NuRxG, Siwoz, lolwheel (OWIE), ThankTheMaker (rESCue), 4_fools & marcos (avaspark), auden_builds (pubmote)
@@ -50,10 +50,10 @@
     ; Spawn the event handler thread and pass the ID it returns to C
     (if (= (get-config 'led-enabled) 1) (setq led-context-id (spawn led-loop))); start the led loop as soon as possible once checks are done. once CAN bus comes online it will start responding, and since this is multi-process now leds won't freeze when can is scanning. :)
     (setq can-context-id (spawn can-loop))
-    ;(if (> (conf-get 'wifi-mode) 0) {
-    ;    (setq wifi-enabled-on-boot t)
-    ;    (if (= (get-config 'pubmote-enabled) 1) (setq pubmote-context-id (spawn pubmote-loop)))
-    ;})
+    (if (> (conf-get 'wifi-mode) 0) {
+        (setq wifi-enabled-on-boot t)
+        (if (= (get-config 'pubmote-enabled) 1) (setq pubmote-context-id (spawn pubmote-loop)))
+    })
     ;(if (= (get-config 'bms-enabled) 1) (setq bms-context-id (spawn bms-loop)))
 })
 

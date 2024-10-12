@@ -1,7 +1,7 @@
-@const-symbol-strings
+;@const-symbol-strings
 
 ; Settings version
-(def config-version 436i32)
+(def config-version 435i32)
 ; Persistent settings
 
 ; Format: (label . (offset type default-value current-value))
@@ -10,7 +10,7 @@
     (crc                       . (1 i 27217 -1))
     (can-id                    . (2  i -1 -1))  ; if can-id < 0 then it will scan for one and pick the first.
     (accept-tos                . (3 b 0 -1))
-    (led-enabled               . (4 b 1 -1)) ;TODO Just flat out don't load code if stuff isn't enabled. Call (reboot on changes that requier it)
+    (led-enabled               . (4 b 1 -1))
     (bms-enabled               . (5 b 0 -1));TODO
     (pubmote-enabled           . (6 b 0 -1));TODO
     (led-on                    . (7  b 1 -1))
@@ -45,7 +45,7 @@
     (led-rear-reversed         . (36 b 0 -1))
     (led-rear-strip-type       . (37 b 2 -1))
     (led-button-pin            . (38 b -1 -1))
-    (led-button-strip-type     . (39 b 0 -1)) ;TODO
+    (led-button-strip-type     . (39 b 0 -1))
     (led-footpad-pin           . (40 i -1 -1)) ;TODO
     (led-footpad-num           . (41 i 0 -1)) ;TODO
     (led-footpad-type          . (42 i 0 -1));TODO
@@ -77,7 +77,10 @@
     (led-dim-on-highbeam-ratio . (68 f 0.0 -1))
     (bms-type                  . (69 i 0 -1))
     (led-status-strip-type     . (70 i 1 -1))
-    (bms-charge-only           . (71 i 0 -1))
+    (bms-charge-only           . (71 b 0 -1))
+    (led-fix                   . (72 i 1 -1))
+    (led-show-battery-charging . (73 b 0 -1))
+    (vin-chatter-threshold     . (74 i 20 -1))
 ))
 
 ;(move-to-flash eeprom-addrs)
@@ -120,7 +123,7 @@
                     in-led-brake-light-enabled in-led-brake-light-min-amps in-idle-timeout in-idle-timeout-shutoff in-led-brightness in-led-brightness-highbeam in-led-brightness-idle in-led-brightness-status in-led-status-pin in-led-status-num
                     in-led-status-type in-led-status-reversed in-led-front-pin in-led-front-num in-led-front-type in-led-front-reversed in-led-front-strip-type
                     in-led-rear-pin in-led-rear-num in-led-rear-type in-led-rear-reversed in-led-rear-strip-type in-led-button-pin in-led-button-strip-type in-led-footpad-pin in-led-footpad-num in-led-footpad-type in-led-footpad-reversed
-                    in-led-footpad-strip-type in-bms-rs485-di-pin in-bms-rs485-do-pin in-bms-rs485-dere-pin in-bms-wakeup-pin in-bms-override-soc in-bms-rs485-chip in-led-loop-delay in-bms-loop-delay in-pubmote-loop-delay in-can-loop-delay in-led-max-blend-count in-led-startup-timeout in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only) {
+                    in-led-footpad-strip-type in-bms-rs485-di-pin in-bms-rs485-do-pin in-bms-rs485-dere-pin in-bms-wakeup-pin in-bms-override-soc in-bms-rs485-chip in-led-loop-delay in-bms-loop-delay in-pubmote-loop-delay in-can-loop-delay in-led-max-blend-count in-led-startup-timeout in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging in-vin-chatter-threshold) {
     (if (>= led-context-id 0){
     (let ((start-time (systime))
         (timeout 100000))  ; Timeout in milliseconds (1 seconds)
@@ -197,6 +200,9 @@
     (set-config 'bms-type (to-i in-bms-type))
     (set-config 'led-status-strip-type (to-i in-led-status-strip-type))
     (set-config 'bms-charge-only (to-i in-bms-charge-only))
+    (set-config 'led-fix (to-i in-led-fix))
+    (set-config 'led-show-battery-charging (to-i in-led-show-battery-charging))
+    (set-config 'vin-chatter-threshold (to-i in-vin-chatter-threshold))
     (if (or (!= (to-i in-bms-rs485-di-pin) bms-rs485-di-pin-prev) (!= (to-i in-bms-rs485-do-pin) bms-rs485-do-pin-prev) (!= (to-i in-bms-rs485-dere-pin) bms-rs485-dere-pin-prev) (!= (to-i in-bms-wakeup-pin) bms-wakeup-pin-prev) ) {
         ;(if (init-bms) )
         ;Todo deal with validating and resetting bms pins
@@ -254,7 +260,7 @@
 })
 
 (defun send-keys (key-list counter-list){
-(atomic {
+
     (print "Received key: ")
     (print key-list)
     (setq key-list (split-list key-list 4))
@@ -270,7 +276,6 @@
     (set-config 'bms-counter-c (pack-bytes-to-uint32 (ix counter-list 2)))
     (set-config 'bms-counter-d (pack-bytes-to-uint32 (ix counter-list 3)))
     (save-config)
-    })
 })
 
 (defun accept-tos(){

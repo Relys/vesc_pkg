@@ -403,6 +403,19 @@ SpinBox {
     value: 4
     editable: true
 }
+
+Text {
+    color: Utility.getAppHexColor("lightText")
+    text: "LED Fix"
+}
+
+SpinBox {
+    id: ledFix
+    from: 1
+    to: 1000000
+    value: 1
+    editable: true
+}
 Text {
     color: Utility.getAppHexColor("lightText")
     text: "Dim RGB on Highbeam (% of main brightness)"
@@ -546,7 +559,23 @@ Slider {
                                     text: "Brake Light"
                                     checked: false
                                 }
+                                CheckBox {
+                                    id: ledShowBatteryCharging
+                                    text: "Show battery % while charging"
+                                    checked: false
+                                }
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Voltage Chatter Threshold"
+                                }
 
+                                SpinBox {
+                                    id: vinChatterThreshold
+                                    from: 1
+                                    to: 1000
+                                    value: 20
+                                    editable: true
+                                }
                                 ColumnLayout {
                                     id: ledBrakeLightLayout
                                     visible: ledBrakeLightEnabled.checked
@@ -1581,7 +1610,10 @@ function makeArgStr() {
         parseFloat(ledDimOnHighbeamRatio.value).toFixed(2),
         bmsType.currentIndex,
         ledStatusStripType.currentIndex,
-        bmsChargeOnly.checked * 1
+        bmsChargeOnly.checked * 1,
+        ledFix.value,
+        ledShowBatteryCharging.checked * 1,
+        vinChatterThreshold.value
 
     ].join(" ");
 }
@@ -1689,7 +1721,10 @@ function makeArgStr() {
                 ledDimOnHighbeamRatio.value = Number(tokens[69])
                 bmsType.currentIndex = Number(tokens[70])
                 ledStatusStripType.currentIndex = Number(tokens[71])
-                bmsChargeOnly.currentIndex = Number(tokens[72])
+                bmsChargeOnly.checked = Number(tokens[72])
+                ledFix.value = Number(tokens[73])
+                ledShowBatteryCharging.checked = Number(tokens[74])
+                vinChatterThreshold.value = Number(tokens[75])
 
                 pubmoteMacAddress.text = "Pubmote MAC: " + ((Number(tokens[46]) != -1) ? "Not Paired" : macAddress.toUpperCase());
             } else if (str.startsWith("msg")) {

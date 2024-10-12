@@ -1,4 +1,4 @@
-@const-symbol-strings
+;@const-symbol-strings
 @const-start
 (def can-loop-delay)  ; Loop delay in microseconds (100ms)
 (def fault-code 0)
@@ -24,6 +24,12 @@
 (def bms-is-charging nil)
 (def bms-charger-just-plugged nil)
 (def bms-charger-plug-in-time 0)
+(def bms-check-voltage-timer 0)
+(def vin -1)
+(def vin-prev -1)
+(def vin-sample -1)
+(def vin-chatter 0)
+
 
 (def FLOAT_MAGIC 101) ; Magic number used by float
 (def FLOAT_ACCESSORIES_MAGIC 102)
@@ -38,6 +44,15 @@
 ))
 
 (def discover-can-id -1)
+
+;(defun watchdog () {
+    ;restart spawn process
+;})
+
+(defun running-state (){
+    ;check if we're running and also provide 1sec delay for sensor fault state or if it's going over certian rpm threshold
+    (let ret (or (and (>= state 1) (<= state 5)) (and (>= state 8) (<= state 9) (>= rpm 100))))
+})
 
 (defun can-loop (){
     (setq can-loop-delay (get-config 'can-loop-delay))
@@ -68,6 +83,25 @@
             (if (not (and bms-charger-just-plugged (<= (- (secs-since 0) bms-charger-plug-in-time) 5))){
                 ; Reset the flag if more than 5 seconds have passed
                 (setq bms-charger-just-plugged nil)
+            })
+        }{;if we don't have a smart BMS, we can guage if it's charging by sampling voltage over time when the board is not running.
+            (if (running-state){
+                (setq bms-is-charging nil)
+            }{
+                (if (!= vin vin-prev){
+                    (setq vin-chatter (+ vin-chatter 1))
+                })
+                (if (>= (- (secs-since 0) bms-check-voltage-timer) 30){
+                    (if (and (>= (- vin vin-sample) 0.0) (>= vin-chatter (get-config 'vin-chatter-threshold)) (< battery-percent-remaining 99.0)){
+                        (setq bms-is-charging t)
+                    }{
+                        (setq bms-is-charging nil)
+                    })
+                    (setq vin-chatter 0)
+                    (setq bms-check-voltage-timer (secs-since 0))
+                    (setq vin-sample vin)
+                })
+                (setq vin-prev vin)
             })
         })
 
@@ -139,6 +173,8 @@
     (setq speed (canget-speed can-id))
     (setq fet-temp-filtered  (canget-temp-fet can-id))
     (setq motor-temp-filtered (canget-temp-motor can-id))
+    (setq vin (canget-vin can-id))
+    (if (= vin-prev -1){ (setq vin-prev vin) (setq vin-sample vin) })
 })
 
 (defun float-cmd (can-id cmd) {
@@ -164,11 +200,11 @@
                 (setq can-id discover-can-id)
                 (setq bms-can-id (get-bms-val 'bms-can-id))
             })
-            (COMMAND_LIGHTS_CONTROL { ;TODO Maybe add float app too for backwards config?
-                (var led-state (bufget-u8 data 2))
+            ;(COMMAND_LIGHTS_CONTROL { ;TODO Maybe add float app too for backwards config?
+                ;(var led-state (bufget-u8 data 2))
                 ;(setq led-on (bits-dec-int led-state 0 1))  ; Get the LSB
                 ;(setq led-highbeam-on (bits-dec-int led-state 1 1))  ; Get the second bit
-            })
+            ;})
             (COMMAND_LCM_POLL {
                 (if (> (buflen data) 13){
                         (var send-state (bufget-u8 data 2))
@@ -181,7 +217,7 @@
                         (setq handtest-mode (= (bitwise-and send-state 0x80) 0x80))  ; Bit 7
 
                         ; Parse the third byte based on state
-                        (if (= state 3){  ; Assuming 3 is STATE_RUNNING
+                        (if (and (>= state 1) (<= state 5)) {
                             (setq pitch-angle 0.0)
                             (setq duty-cycle-now (to-float third-byte))
                         }{
@@ -217,7 +253,7 @@
                         ;(setq fet-temp-filtered (/ (bufget-u8 data 38) 2.0))
                         ;(setq motor-temp-filtered (/ (bufget-u8 data 39) 2.0))
                     ;})
-                    (if (>= mode 3) {
+                    (if (and (>= mode 3) (>= (buflen data) 42) ) {
                         (setq odometer-initial (bufget-u32 data 41)) ;meters
                         ;(setq battery-level (/ (bufget-u8 data 53) 2.0))
                     })

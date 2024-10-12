@@ -1,4 +1,4 @@
-@const-symbol-strings
+;@const-symbol-strings
 
 ;Future interesting functions
 ;(main-init-done)

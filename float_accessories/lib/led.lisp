@@ -204,6 +204,9 @@
     (var loop-start-time 0)
     (var loop-end-time 0)
     (var led-loop-delay-sec (/ 1.0 led-loop-delay))
+    (var prev-direction 1)
+    (var direction-change-start-time 0)
+    (var direction-change-window 0.5)
     (loopwhile t {
         (setq loop-start-time (secs-since 0))
 
@@ -215,12 +218,27 @@
         (if (= state 4) ; RUNNING_UPSIDEDOWN
             (setq idle-rpm-darkride (* idle-rpm-darkride -1))
         )
-        (if (!= state 3){;Ignore direction changes during wheelslip. Can also add a timer if this isn't sufficent.
+        (if (!= state 3){;Ignore direction changes during wheelslip.
+            (var current-direction direction)
             (if (> rpm idle-rpm-darkride) {;deadzone
-                (setq direction 1)
+                (setq current-direction 1)
             })
             (if (< rpm (* idle-rpm-darkride -1)) {
-                (setq direction -1)
+                (setq current-direction -1)
+            })
+            (if (!= current-direction prev-direction) {
+                (if (= direction-change-start-time 0) {
+                    ; Start the timer for a new potential direction change
+                    (setq direction-change-start-time (systime))
+                }{
+                    ; Check if the timer has expired
+                    (if (>= (secs-since direction-change-start-time) direction-change-window) {
+                        ; Timer expired, commit the direction change
+                        (setq direction current-direction)
+                        (setq prev-direction current-direction)
+                        (setq direction-change-start-time 0)
+                    })
+                })
             })
         })
         (if (= led-mall-grab-enabled 1) {

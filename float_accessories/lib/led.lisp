@@ -215,11 +215,13 @@
         (if (= state 4) ; RUNNING_UPSIDEDOWN
             (setq idle-rpm-darkride (* idle-rpm-darkride -1))
         )
-        (if (> rpm idle-rpm-darkride) {
-            (setq direction 1)
-        })
-        (if (< rpm (* idle-rpm-darkride -1)) {
-            (setq direction -1)
+        (if (!= state 3){;Ignore direction changes during wheelslip. Can also add a timer if this isn't sufficent.
+            (if (> rpm idle-rpm-darkride) {;deadzone
+                (setq direction 1)
+            })
+            (if (< rpm (* idle-rpm-darkride -1)) {
+                (setq direction -1)
+            })
         })
         (if (= led-mall-grab-enabled 1) {
             ;check if we have pitch-angle instead of duty

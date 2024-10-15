@@ -50,9 +50,10 @@
 ;})
 
 (defun running-state (){
-    ;check if we're running and also provide 2sec delay for a fault state if it's going over a certian RPM to prevent headlights flickering
-    (if (and (>= state 1) (< state 5)) (setq last-running-state-time (systime)))
-    (let ret (or (and (>= state 1) (<= state 5)) (and (> (secs-since last-running-state-time) 2) (>= rpm 10))))
+    ;check if we're running and also provide 2sec delay for a fault state if it's going over a duty cycle to prevent headlights flickering. This may be already fixed with wheelslip for direction.
+    ;(if (and (>= state 1) (< state 5)) (setq last-running-state-time (systime)))
+    ;(let ret (or (and (>= state 1) (<= state 5)) (and  (>= state 8) (<= state 9) (> (secs-since last-running-state-time) 2) (>= duty-cycle-now 1))))
+    (let ret (and (>= state 1) (<= state 5)))
 })
 
 (defun can-loop (){
@@ -285,7 +286,7 @@
                                     (let ((raw-value (bufget-u8 data 32)))
                                     (if (= raw-value 0)
                                         0.0  ; Handle the case where the raw value is 0
-                                        (abs (- raw-value 128.0)))))
+                                        (- raw-value 128.0))))
                                 ;(def foc-id-t (/ (bufget-u8 data 33) 3.0))
 
                                 (if (and (>= mode 2) (>= (buflen data) 39)) {
@@ -306,7 +307,7 @@
                                     (setq battery-percent-remaining (to-float (bufget-u8 data 53)))
                                 })
 
-                                ;(if (>= mode 4) {
+                                ;(if (and (>= mode 4) (>= (buflen data) 56)) {
                                     ;(def charging-current-t (/ (to-float (bufget-i16 data 54)) 10))
                                     ;(def charging-voltage-t (/ (to-float (bufget-i16 data 56)) 10))
                                 ;})

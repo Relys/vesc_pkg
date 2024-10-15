@@ -15,9 +15,8 @@
 (def distance-abs -1)
 (def fet-temp-filtered 0)
 (def motor-temp-filtered 0)
-(def odometer-initial -1)
 (def odometer -1)
-(def battery-level 0)
+(def odometer-init -1)
 (def battery-percent-remaining 0.0)
 (def can-id -1)
 (def bms-can-id -1)
@@ -29,6 +28,7 @@
 (def vin-prev -1)
 (def vin-sample -1)
 (def vin-chatter 0)
+(def last-running-state-time 0)
 
 
 (def FLOAT_MAGIC 101) ; Magic number used by float
@@ -50,8 +50,9 @@
 ;})
 
 (defun running-state (){
-    ;check if we're running and also provide 1sec delay for sensor fault state or if it's going over certian rpm threshold
-    (let ret (or (and (>= state 1) (<= state 5)) (and (>= state 8) (<= state 9) (>= rpm 100))))
+    ;check if we're running and also provide 2sec delay for a fault state if it's going over a certian RPM to prevent headlights flickering
+    (if (and (>= state 1) (< state 5)) (setq last-running-state-time (systime)))
+    (let ret (or (and (>= state 1) (<= state 5)) (and (> (secs-since last-running-state-time) 2) (>= rpm 10))))
 })
 
 (defun can-loop (){
@@ -63,10 +64,11 @@
     (init-can)
     (loopwhile t {
         (setq loop-start-time  (secs-since 0))
-        (float-cmd can-id (list (assoc float-cmds 'COMMAND_LCM_POLL)))
+        ;(float-cmd can-id (list (assoc float-cmds 'COMMAND_LCM_POLL)))
         ;(float-cmd can-id (list (assoc float-cmds 'COMMAND_LIGHTS_CONTROL)))
-        (float-cmd can-id (list (assoc float-cmds 'COMMAND_LCM_GET_BATTERY)));TODO maybe use SOC if bms is detected?
-        (get-vesc-status-msg)
+        ;(float-cmd can-id (list (assoc float-cmds 'COMMAND_LCM_GET_BATTERY)))
+        (float-cmd can-id (list (assoc float-cmds 'COMMAND_GET_ALLDATA) 3))
+        ;(get-vesc-status-msg)
 
         (if (>= bms-can-id 0){
             (var prev-charging-state bms-is-charging)
@@ -103,14 +105,6 @@
                 })
                 (setq vin-prev vin)
             })
-        })
-
-        ;Let's only call COMMAND_GET_ALLDATA once and then we can calculate current trip by adding distance abs
-        (if (or (< odometer-initial 0) (< distance-abs 0)){
-            (float-cmd (get-config 'can-id) (list (assoc float-cmds 'COMMAND_GET_ALLDATA) 3))
-            (setq odometer odometer-initial)
-        }{
-            (setq odometer (+ odometer-initial distance-abs))
         })
 
         ; Capture end time and calculate actual loop time
@@ -167,15 +161,15 @@
     (return 0)
 })
 
-(defun get-vesc-status-msg (){
-    (setq tot-current (canget-current can-id))
-    (setq distance-abs (canget-dist can-id))
-    (setq speed (canget-speed can-id))
-    (setq fet-temp-filtered  (canget-temp-fet can-id))
-    (setq motor-temp-filtered (canget-temp-motor can-id))
-    (setq vin (canget-vin can-id))
-    (if (= vin-prev -1){ (setq vin-prev vin) (setq vin-sample vin) })
-})
+;(defun get-vesc-status-msg (){
+    ;(setq tot-current (canget-current can-id))
+    ;(setq distance-abs (canget-dist can-id))
+    ;(setq speed (canget-speed can-id))
+    ;(setq fet-temp-filtered  (canget-temp-fet can-id))
+    ;(setq motor-temp-filtered (canget-temp-motor can-id))
+    ;(setq vin (canget-vin can-id))
+    ;(if (= vin-prev -1){ (setq vin-prev vin) (setq vin-sample vin) })
+;})
 
 (defun float-cmd (can-id cmd) {
     (send-data (append (list FLOAT_MAGIC) cmd) 2 can-id)
@@ -205,68 +199,123 @@
                 ;(setq led-on (bits-dec-int led-state 0 1))  ; Get the LSB
                 ;(setq led-highbeam-on (bits-dec-int led-state 1 1))  ; Get the second bit
             ;})
-            (COMMAND_LCM_POLL {
-                (if (> (buflen data) 13){
-                        (var send-state (bufget-u8 data 2))
-                        (setq fault-code (bufget-u8 data 3))
-                        (var third-byte (bufget-u8 data 4))
+            ;(COMMAND_LCM_POLL {
+                ;(if (> (buflen data) 13){
+                        ;(var send-state (bufget-u8 data 2))
+                        ;(setq fault-code (bufget-u8 data 3))
+                        ;(var third-byte (bufget-u8 data 4))
 
                         ; Parse send-state
-                        (setq state (bitwise-and send-state 0x0F))  ; Lower 4 bits
-                        (setq switch-state (bitwise-and (shr send-state 4) 0x07))  ; Bits 4-6
-                        (setq handtest-mode (= (bitwise-and send-state 0x80) 0x80))  ; Bit 7
+                        ;(setq state (bitwise-and send-state 0x0F))  ; Lower 4 bits
+                        ;(setq switch-state (bitwise-and (shr send-state 4) 0x07))  ; Bits 4-6
+                        ;(setq handtest-mode (= (bitwise-and send-state 0x80) 0x80))  ; Bit 7
 
                         ; Parse the third byte based on state
-                        (if (and (>= state 1) (<= state 5)) {
-                            (setq pitch-angle 0.0)
-                            (setq duty-cycle-now (to-float third-byte))
-                        }{
-                            (setq pitch-angle (to-float (if (> third-byte 127)
-                                                            (- third-byte 256)
-                                                            third-byte)))
-                            (setq duty-cycle-now 0.0)
-                        })
+                        ;(if (and (>= state 1) (<= state 5)) {
+                            ;(setq pitch-angle 0.0)
+                            ;(setq duty-cycle-now (to-float third-byte))
+                       ; }{
+                            ;(setq pitch-angle (to-float (if (> third-byte 127)
+                                                            ;(- third-byte 256)
+                                                            ;third-byte)))
+                            ;(setq duty-cycle-now 0.0)
+                        ;})
 
                         ; Parse the rest of the data
-                        (setq rpm (/ (to-float (bufget-i16 data 5)) 10))
+                        ;(setq rpm (/ (to-float (bufget-i16 data 5)) 10))
                         ;(var tot-current-in (/ (to-float (bufget-i16 data 7)) 10))
                         ;(print tot-current-in)
-                        (setq input-voltage-filtered (/ (to-float (bufget-i16 data 9)) 10))
+                        ;(setq input-voltage-filtered (/ (to-float (bufget-i16 data 9)) 10))
                         ;(setq led-brightness (/ (bufget-u8 data 11) 100.0))
                         ;(setq led-brightness-idle (/ (bufget-u8 data 12) 100.0))
                         ;(setq led-brightness-status (/ (bufget-u8 data 13) 100.0))
 
                         ; You can add extra processing here if needed
-                    })
-            })
-                (COMMAND_LCM_GET_BATTERY {
-                    (if  (> (buflen data) 2){
-                        (setq battery-percent-remaining (bufget-f32 data 2))
-                    })
-                })
-                (COMMAND_GET_ALLDATA {
-                    (var mode (bufget-u8 data 2))
-                    ;(setq speed (/ (to-float (bufget-i16 data 26)) 10))
-                    ;(if (>= mode 2) {
-                        ;(setq roll-angle (/ (to-float (bufget-i16 data 7)) 10))
-                        ;(setq distance-abs (bufget-f32 data 34))
-                        ;(setq fet-temp-filtered (/ (bufget-u8 data 38) 2.0))
-                        ;(setq motor-temp-filtered (/ (bufget-u8 data 39) 2.0))
                     ;})
-                    (if (and (>= mode 3) (>= (buflen data) 42) ) {
-                        (setq odometer-initial (bufget-u32 data 41)) ;meters
-                        ;(setq battery-level (/ (bufget-u8 data 53) 2.0))
+            ;})
+                ;(COMMAND_LCM_GET_BATTERY {
+                    ;(if  (> (buflen data) 2){
+                        ;(setq battery-percent-remaining (bufget-f32 data 2))
+                    ;})
+                ;})
+                (COMMAND_GET_ALLDATA {
+                    (if  (> (buflen data) 3){
+                        (var mode (bufget-u8 data 2))
+
+                        (if (= mode 69) {
+                            (setq fault-code (bufget-u8 data 3))
+                        }{
+                            (setq fault-code 0)
+                            (if (>= (buflen data) 32) {
+                                ;(def pid-value-t (/ (to-float (bufget-i16 data 3)) 10))
+                                ;(def balance-pitch-t (/ (to-float (bufget-i16 data 5)) 10))
+                                (def roll-angle (/ (to-float (bufget-i16 data 7)) 10))
+
+                                (var state-byte (bufget-u8 data 9))
+                                (setq state (bitwise-and state-byte 0x0F))
+                                ;(def sat-t (shr state-byte 4))
+
+                                (var switch-state-byte (bufget-u8 data 10))
+                                (setq switch-state (bitwise-and switch-state-byte 0x0F))
+                                ;(def beep-reason-t (shr switch-state-byte 4))
+                                (setq handtest-mode (= (bitwise-and switch-state-byte 0x08) 0x08))
+
+                                ;(def footpad-adc1-t (bufget-u8 data 11))
+                                ;(def footpad-adc2-t (bufget-u8 data 12))
+
+                                ; Setpoints
+                                ;(def setpoint-t (- (bufget-u8 data 13) 128))
+                                ;(def atr-offset-t (- (bufget-u8 data 14) 128))
+                                ;(def braketilt-offset-t (- (bufget-u8 data 15) 128))
+                                ;(def torquetilt-offset-t (- (bufget-u8 data 16) 128))
+                                ;(def turntilt-interpolated-t (- (bufget-u8 data 17) 128))
+                                ;(def inputtilt-interpolated-t (- (bufget-u8 data 18) 128))
+
+                                (setq pitch-angle (/ (to-float (bufget-i16 data 19)) 10))
+                                ;(def applied-booster-current-t (- (bufget-u8 data 21) 128))
+
+                                ; Motor stuff
+                                (setq vin (/ (to-float (bufget-i16 data 22)) 10))
+                                (if (= vin-prev -1){ (setq vin-prev vin) (setq vin-sample vin) })
+                                (setq rpm (/ (to-float  (bufget-i16 data 24)) 10))
+                                (setq speed (*  (to-float (bufget-i16 data 26)) 100))
+                                (setq tot-current (/ (to-float (bufget-i16 data 28)) 10))
+                                ;(def tot-current-in-t (/ (to-float (bufget-i16 data 30)) 10))
+                                (setq duty-cycle-now
+                                    (let ((raw-value (bufget-u8 data 32)))
+                                    (if (= raw-value 0)
+                                        0.0  ; Handle the case where the raw value is 0
+                                        (abs (- raw-value 128.0)))))
+                                ;(def foc-id-t (/ (bufget-u8 data 33) 3.0))
+
+                                (if (and (>= mode 2) (>= (buflen data) 39)) {
+                                    ;(def distance-abs-t (bufget-f32-auto data 34))
+                                    (setq fet-temp-filtered (/ (bufget-u8 data 38) 2.0))
+                                    (setq motor-temp-filtered (/ (bufget-u8 data 39) 2.0))
+                                    ;(def batt-temp-t (/ (bufget-u8 data 40) 2.0)) ; Always 0 in the C code
+                                })
+
+                                (if (and (>= mode 3) (>= (buflen data) 52)) {
+                                    (setq odometer (bufget-u32 data 41))
+                                    (if (= odometer-init -1) (setq odometer-init odometer))
+                                    (setq distance-abs (- odometer odometer-init))
+                                    ;(def amp-hours-t (/ (to-float (bufget-i16 data 45)) 10))
+                                    ;(def amp-hours-charged-t (/ (to-float (bufget-i16 data 47)) 10))
+                                    ;(def watt-hours-t (to-float (bufget-i16 data 49)))
+                                    ;(def watt-hours-charged-t (to-float (bufget-i16 data 51)))
+                                    (setq battery-percent-remaining (to-float (bufget-u8 data 53)))
+                                })
+
+                                ;(if (>= mode 4) {
+                                    ;(def charging-current-t (/ (to-float (bufget-i16 data 54)) 10))
+                                    ;(def charging-voltage-t (/ (to-float (bufget-i16 data 56)) 10))
+                                ;})
+                            })
+                        })
                     })
-                    ;(print roll-angle)
-                    ;(print distance-abs)
-                    ;(print fet-temp-filtered)
-                    ;(print motor-temp-filtered)
-                    ;(print odometer)
-                    ;(print battery-level)
                 })
                 (_ nil) ; Ignore other commands
             )
     })
-    ;(free data)
 })
 @const-end

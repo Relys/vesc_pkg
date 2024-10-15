@@ -15,6 +15,24 @@
 (defun max (a b) (if (> a b) a b))
 (defun min (a b) (if (< a b) a b))
 
+;(defun bufget-f32-auto (buffer index) {
+;    (var value (bufget-u32 buffer index 'big-endian))
+;    (var result 0.0)
+;
+;    (var sign (if (= (bitwise-and value 0x80000000) 0u32) 1 -1))
+;    (var expo (bitwise-and (shr value 23) 0xFF))
+;    (var sig (bitwise-and value 0x7FFFFF))
+;
+;    (if (= expo 0) {
+;        (setq result 0.0)
+;    } {
+;        (var sig-f (+ (/ sig 16777216.0) 0.5))
+;        (setq result (* sign sig-f (pow 2.0 (- expo 126))))
+;        ;; Apply scaling factor
+;        (setq result (* result 71.75))
+;    })
+;})
+
 (defun event-handler ()
     (loopwhile t
         (recv

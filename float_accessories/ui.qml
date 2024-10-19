@@ -11,6 +11,19 @@ Item {
     id: container
     anchors.fill: parent
     anchors.margins: 10
+    property int pubmotePairCode: -1  // Initialize with a default invalid value
+    property bool pairingTimeout: false
+    property int remainingTime: 30  // Initialize with the full 30 seconds
+
+    property Commands mCommands: VescIf.commands()
+    property int floatAccessoriesMagic: 102
+    property bool acceptTOS: false
+    Component.onCompleted: {
+        if (!(VescIf.getLastFwRxParams().hw.includes("Express") || VescIf.getLastFwRxParams().hw.includes("Avaspark")) || VescIf.getLastFwRxParams().hw.includes("rESCue")) {
+            VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express, Avaspark or rESCue board", false, false)
+        }
+        sendCode("f" + "(send-config)")
+    }
 
 Timer {
     id: statusCheckTimer
@@ -21,15 +34,98 @@ Timer {
         sendCode("f" + "(status)")
     }
 }
-
-    property Commands mCommands: VescIf.commands()
-    property int floatAccessoriesMagic: 102
-    property bool acceptTOS: false
-    Component.onCompleted: {
-        if (!(VescIf.getLastFwRxParams().hw.includes("Express") || VescIf.getLastFwRxParams().hw.includes("Avaspark")) || VescIf.getLastFwRxParams().hw.includes("rESCue")) {
-            VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express, Avaspark or rESCue board", false, false)
+    // Timer for 30-second timeout
+    Timer {
+        id: pairingTimeoutTimer
+        interval: 1000  // 1 second
+        running: false
+        repeat: true
+        onTriggered: {
+            remainingTime--;  // Decrease the remaining time by 1 second
+            if (remainingTime <= 0) {
+                pairingTimeout = true;
+                sendCode("f(pair-pubmote -2)");  // Automatically reject if time runs out
+                pubmotePairPopup.close();
+            }
         }
-        sendCode("f" + "(send-config)")
+    }
+  // Popup for Pubmote pairing confirmation
+    Popup {
+        id: pubmotePairPopup
+        modal: true
+        focus: true
+        visible: false
+        width: parent.width * 0.8
+        height: parent.height * 0.3
+        anchors.centerIn: parent
+
+        background: Rectangle {
+            color: "black"
+            radius: 10
+        }
+
+        onVisibleChanged: {
+            if (visible) {
+                // Generate code only when the popup is shown
+                pubmotePairCode = Math.floor(1000 + Math.random() * 9000);  // Generates a number between 1000 and 9999
+                pairingTimeout = false;  // Reset timeout flag
+                remainingTime = 30;  // Reset the timer to 30 seconds
+                pairingTimeoutTimer.start();  // Start the 1-second timer to count down
+
+                // Send the pairing request with the generated code
+                sendCode("f(pair-pubmote " + pubmotePairCode + ")");
+            } else {
+                pairingTimeoutTimer.stop();  // Stop timer if the popup is closed
+            }
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 10
+
+            Text {
+                text: "Confirm Pubmote Pairing"
+                color: "white"
+                font.pointSize: 16
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Text {
+                text: "Pairing Code: " + pubmotePairCode
+                color: "white"
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Text {
+                text: "Time remaining: " + remainingTime + " seconds"
+                color: "white"
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            RowLayout {
+                spacing: 10
+                Layout.alignment: Qt.AlignHCenter
+
+                Button {
+                    text: "Accept"
+                    onClicked: {
+                        if (!pairingTimeout) {
+                            sendCode("f(pair-pubmote -1)");  // Accept pairing
+                            pubmotePairPopup.close();
+                        }
+                    }
+                }
+
+                Button {
+                    text: "Reject"
+                    onClicked: {
+                        sendCode("f(pair-pubmote -2)");  // Reject pairing manually
+                        pubmotePairPopup.close();
+                    }
+                }
+            }
+        }
     }
 Popup {
     id: keySettingPopup
@@ -1117,7 +1213,7 @@ SpinBox {
                                 Button {
                                     text: "Pair Pubmote"
                                     onClicked: {
-                                        sendCode("f" + "(pair-pubmote 420)")
+                                        pubmotePairPopup.open();  // Open the confirmation popup with the random code
                                     }
                                 }
 
@@ -1726,7 +1822,7 @@ function makeArgStr() {
                 ledShowBatteryCharging.checked = Number(tokens[74])
                 vinChatterThreshold.value = Number(tokens[75])
 
-                pubmoteMacAddress.text = "Pubmote MAC: " + ((Number(tokens[46]) != -1) ? "Not Paired" : macAddress.toUpperCase());
+                pubmoteMacAddress.text = "Pubmote MAC: " + ((Number(tokens[46]) == -1) ? "Not Paired" : macAddress.toUpperCase());
             } else if (str.startsWith("msg")) {
                 var msg = str.substring(4)
                 VescIf.emitMessageDialog("Float Accessories", msg, false, false)

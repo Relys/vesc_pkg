@@ -39,13 +39,21 @@
             (write-val-eeprom 'esp-now-secret-code (get-config 'esp-now-secret-code))
             (write-val-eeprom 'crc (config-crc))
             (init-pubmote)
-        (setq pairing-state 0)
+            (var tmpbuf (bufcreate 4))
+            (bufset-i32 tmpbuf 0 -1)
+            (esp-now-send esp-now-remote-mac tmpbuf)
+            (free tmpbuf)
+            (setq pairing-state 0)
         })
         ((= pairing -2) { ;paring rejected
-            (setq esp-now-remote-mac '())
             (set-config 'esp-now-remote-mac-a -1)
             (write-val-eeprom 'esp-now-remote-mac-a (get-config 'esp-now-remote-mac-a) -1)
             (write-val-eeprom 'crc (config-crc))
+            (var tmpbuf (bufcreate 4))
+            (bufset-i32 tmpbuf 0 -2)
+            (esp-now-send esp-now-remote-mac tmpbuf)
+            (free tmpbuf)
+            (setq esp-now-remote-mac '())
             (setq pairing-state 0)
         })
     )
@@ -84,7 +92,8 @@
                     (esp-now-del-peer esp-now-remote-mac)
                     (setq pairing-state 2)
                 })
-                (if (and (= pairing-state 0) (>= (get-config 'esp-now-remote-mac-a) 0) (<= (secs-since pubmote-last-activity-time) 5) (>= (get-config 'can-id) 0)){
+                ;(if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0)){
+                    (if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1)){
                     (bufset-u8 data 0 69) ; Mode
                     (bufset-u8 data 1 fault-code)
                     (bufset-i16 data 2 (floor (* pitch-angle 10)))
@@ -149,11 +158,11 @@
             (free tmpbuf)
             (esp-now-del-peer esp-now-remote-mac)
             ;(setq pairing-state 0)
-            (pair-pubmote -1)
+            ;(pair-pubmote -1)
         }{
-            (if (and (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) { ;TODO client side buffers changed
+            (if (and (= pairing-state 0) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) { ;TODO client side buffers changed
                 (setq pubmote-last-activity-time (systime))
-                (print (list "Received" src des data rssi))
+                ;(print (list "Received" src des data rssi))
                 (var jsx (bufget-f32 data 4 'little-endian))
                 (var jsy (bufget-f32 data 8 'little-endian))
                 (var bt-c (bufget-u8 data 12))

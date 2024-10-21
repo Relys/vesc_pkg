@@ -100,7 +100,7 @@
                     (bufset-i16 data 4 (floor (* roll-angle 10)))
                     (bufset-u8 data 6 state)
                     (bufset-u8 data 7 switch-state)
-                    (bufset-i16 data 8 (floor (* input-voltage-filtered 10)))
+                    (bufset-i16 data 8 (floor (* vin 10)))
                     (bufset-i16 data 10 (floor rpm))
                     (bufset-i16 data 12 (floor (* speed 10)))
                     (bufset-i16 data 14 (floor (* tot-current 10)))
@@ -146,33 +146,35 @@
 
 (defun pubmote-rx (src des data rssi) {
     (if (get-config 'pubmote-enabled){
-        (if (= pairing-state 2) {
-            ;(print (get-mac-addr))
-            ;(print src)
-            ;(print (get-config 'esp-now-secret-code))
-            (setq esp-now-remote-mac src)
-            (esp-now-add-peer esp-now-remote-mac)
-            (var tmpbuf (bufcreate 4))
-            (bufset-i32 tmpbuf 0 (get-config 'esp-now-secret-code))
-            (esp-now-send esp-now-remote-mac tmpbuf) ;TODO client side
-            (free tmpbuf)
-            (esp-now-del-peer esp-now-remote-mac)
-            ;(setq pairing-state 0)
-            ;(pair-pubmote -1)
-        }{
-            (if (and (= pairing-state 0) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) { ;TODO client side buffers changed
+        (if (and (= pairing-state 0) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) { ;TODO client side buffers changed
+            (atomic {
                 (setq pubmote-last-activity-time (systime))
                 ;(print (list "Received" src des data rssi))
-                (var jsx (bufget-f32 data 4 'little-endian))
-                (var jsy (bufget-f32 data 8 'little-endian))
+                (var jsy (bufget-f32 data 4 'little-endian))
+                (var jsx (bufget-f32 data 8 'little-endian))
                 (var bt-c (bufget-u8 data 12))
                 (var bt-z (bufget-u8 data 13))
                 (var is-rev (bufget-u8 data 14))
-                (print (list jsy jsx bt-c bt-z is-rev))
+                ;(print (list jsy jsx bt-c bt-z is-rev))
                 ;(rcode-run-noret (get-config 'can-id) `(set-remote-state ,jsy ,jsx ,bt-c ,bt-z ,is-rev))
                 (if (>= (get-config 'can-id) 0) {
                     (can-cmd (get-config 'can-id) (str-replace (to-str(list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
                 })
+            })
+        }{
+            (if (= pairing-state 2) {
+                ;(print (get-mac-addr))
+                ;(print src)
+                ;(print (get-config 'esp-now-secret-code))
+                (setq esp-now-remote-mac src)
+                (esp-now-add-peer esp-now-remote-mac)
+                (var tmpbuf (bufcreate 4))
+                (bufset-i32 tmpbuf 0 (get-config 'esp-now-secret-code))
+                (esp-now-send esp-now-remote-mac tmpbuf) ;TODO client side
+                (free tmpbuf)
+                (esp-now-del-peer esp-now-remote-mac)
+                ;(setq pairing-state 0)
+                ;(pair-pubmote -1)
             })
         })
     })

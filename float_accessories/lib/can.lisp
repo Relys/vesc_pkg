@@ -8,7 +8,6 @@
 (def switch-state 0)
 (def handtest-mode nil)
 (def rpm 0)
-(def input-voltage-filtered 0)
 (def speed 0)
 (def tot-current 0)
 (def duty-cycle-now 0)
@@ -226,7 +225,7 @@
                         ;(setq rpm (/ (to-float (bufget-i16 data 5)) 10))
                         ;(var tot-current-in (/ (to-float (bufget-i16 data 7)) 10))
                         ;(print tot-current-in)
-                        ;(setq input-voltage-filtered (/ (to-float (bufget-i16 data 9)) 10))
+                        ;(setq vin (/ (to-float (bufget-i16 data 9)) 10))
                         ;(setq led-brightness (/ (bufget-u8 data 11) 100.0))
                         ;(setq led-brightness-idle (/ (bufget-u8 data 12) 100.0))
                         ;(setq led-brightness-status (/ (bufget-u8 data 13) 100.0))
@@ -279,14 +278,12 @@
                                 (setq vin (/ (to-float (bufget-i16 data 22)) 10))
                                 (if (= vin-prev -1){ (setq vin-prev vin) (setq vin-sample vin) })
                                 (setq rpm (/ (to-float  (bufget-i16 data 24)) 10))
-                                (setq speed (*  (to-float (bufget-i16 data 26)) 100))
+                                (setq speed (/ (to-float (bufget-i16 data 26)) 10))
                                 (setq tot-current (/ (to-float (bufget-i16 data 28)) 10))
                                 ;(def tot-current-in-t (/ (to-float (bufget-i16 data 30)) 10))
-                                (setq duty-cycle-now
-                                    (let ((raw-value (bufget-u8 data 32)))
-                                    (if (= raw-value 0)
-                                        0.0  ; Handle the case where the raw value is 0
-                                        (- raw-value 128.0))))
+                                (setq duty-cycle-now (/ (to-float (- (bufget-u8 data 32) 128)) 100))
+                                ;(print (canget-duty can-id))
+                                ;(print duty-cycle-now)
                                 ;(def foc-id-t (/ (bufget-u8 data 33) 3.0))
 
                                 (if (and (>= mode 2) (>= (buflen data) 39)) {
@@ -304,7 +301,8 @@
                                     ;(def amp-hours-charged-t (/ (to-float (bufget-i16 data 47)) 10))
                                     ;(def watt-hours-t (to-float (bufget-i16 data 49)))
                                     ;(def watt-hours-charged-t (to-float (bufget-i16 data 51)))
-                                    (setq battery-percent-remaining (to-float (bufget-u8 data 53)))
+                                    (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 2))
+                                    ;(print battery-percent-remaining)
                                 })
 
                                 ;(if (and (>= mode 4) (>= (buflen data) 56)) {

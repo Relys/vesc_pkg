@@ -257,6 +257,10 @@
     (rgbled-deinit)
     (setq led-context-id (if (= (get-config 'led-enabled) 1) (spawn led-loop) -1))
     ;(setq bms-context-id (if (= (get-config 'bms-enabled) 1) (spawn bms-loop) -1))
+
+    (if (= in-pubmote-enabled 1) {
+        (if (= pubmote-context-id -1) (setq pubmote-context-id (spawn pubmote-loop)))
+    })
 })
 
 (defun send-keys (key-list counter-list){

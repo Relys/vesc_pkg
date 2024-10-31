@@ -845,6 +845,7 @@ SpinBox {
                                         {text: "Avaspark Laserbeam Pint", value: 3},
                                         {text: "JetFleet H4", value: 4},
                                         {text: "JetFleet GT", value: 5},
+                                        {text: "Stock GT", value: 6},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -870,6 +871,25 @@ SpinBox {
                                         from: -1
                                         to: 100
                                         value: 8
+                                        editable: true
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    id: ledFrontHeadlightPinLayout
+                                    visible: ledFrontStripType.currentValue === 6
+                                    spacing: 10
+
+                                    Text {
+                                        color: Utility.getAppHexColor("lightText")
+                                        text: "Front Headlight Pin"
+                                    }
+
+                                    SpinBox {
+                                        id: ledFrontHeadlightPin
+                                        from: -1
+                                        to: 100
+                                        value: -1
                                         editable: true
                                     }
                                 }
@@ -952,6 +972,7 @@ SpinBox {
                                         {text: "Avaspark Laserbeam Pint", value: 3},
                                         {text: "JetFleet H4", value: 4},
                                         {text: "JetFleet GT", value: 5},
+                                        {text: "Stock GT", value: 6},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -980,7 +1001,24 @@ SpinBox {
                                         editable: true
                                     }
                                 }
+                                ColumnLayout {
+                                    id: ledRearHeadlightPinLayout
+                                    visible: ledRearStripType.currentValue === 6
+                                    spacing: 10
 
+                                    Text {
+                                        color: Utility.getAppHexColor("lightText")
+                                        text: "Rear Headlight Pin"
+                                    }
+
+                                    SpinBox {
+                                        id: ledRearHeadlightPin
+                                        from: -1
+                                        to: 100
+                                        value: -1
+                                        editable: true
+                                    }
+                                }
                                 ColumnLayout {
                                     id: ledRearCustomSettings
                                     visible: ledRearStripType.currentValue === 1
@@ -1576,6 +1614,10 @@ TextArea {
                 ledFrontNum.value = 11
                 ledFrontType.currentIndex = 1
                 break
+            case 6: // Stock GT
+                ledFrontNum.value = 11
+                ledFrontType.currentIndex = 0
+                break
             default:
                 // Do nothing, keep user-defined values
         }
@@ -1602,6 +1644,10 @@ TextArea {
             case 5: // JetFleet GT
                 ledRearNum.value = 11
                 ledRearType.currentIndex = 1
+                break
+            case 6: // Stock GT
+                ledRearNum.value = 11
+                ledRearType.currentIndex = 0
                 break
             default:
                 // Do nothing, keep user-defined values
@@ -1709,7 +1755,9 @@ function makeArgStr() {
         bmsChargeOnly.checked * 1,
         ledFix.value,
         ledShowBatteryCharging.checked * 1,
-        vinChatterThreshold.value
+        vinChatterThreshold.value,
+        ledFrontHeadlightPin.value,
+        ledRearHeadlightPin.value
 
     ].join(" ");
 }
@@ -1821,6 +1869,8 @@ function makeArgStr() {
                 ledFix.value = Number(tokens[73])
                 ledShowBatteryCharging.checked = Number(tokens[74])
                 vinChatterThreshold.value = Number(tokens[75])
+                ledFrontHeadlightPin.value = Number(tokens[76])
+                ledRearHeadlightPin.value = Number(tokens[77])
 
                 pubmoteMacAddress.text = "Pubmote MAC: " + ((Number(tokens[46]) == -1) ? "Not Paired" : macAddress.toUpperCase());
             } else if (str.startsWith("msg")) {

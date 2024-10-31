@@ -73,6 +73,8 @@
 (def combined-pins nil)
 (def led-fix 1)
 (def led-show-battery-charging 0)
+(def led-front-headlight-pin)
+(def led-rear-headlight-pin)
 
 (defun load-led-settings () {
 ; Setting up all variables with get-config to fetch from EEPROM
@@ -122,6 +124,8 @@
     (setq led-loop-delay (get-config 'led-loop-delay))
     (setq led-fix (get-config 'led-fix))
     (setq led-show-battery-charging (get-config 'led-show-battery-charging))
+    (setq led-front-headlight-pin (get-config 'led-front-headlight-pin))
+    (setq led-rear-headlight-pin (get-config 'led-front-headlight-pin))
 })
 
 (defun init-led-vars () {
@@ -146,6 +150,14 @@
     })
     ;Update footpad
 
+    (if (and (= led-front-strip-type 6) (>= led-front-headlight-pin 0)) {
+        (gpio-configure led-front-headlight-pin 'pin-mode-out)
+    })
+
+    (if (and (= led-rear-strip-type 6) (>= led-rear-headlight-pin 0)) {
+        (gpio-configure led-rear-headlight-pin 'pin-mode-out)
+    })
+
     (var front-highbeam-leds 0)
     (var rear-highbeam-leds 0)
     (cond
@@ -155,10 +167,10 @@
         ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3)) {
              (setq rear-highbeam-leds (+ rear-highbeam-leds 1))
         })
-        ((or (= led-front-strip-type 3) (= led-front-strip-type 4)) {
+        ((or (= led-front-strip-type 4) (= led-front-strip-type 5)) {
              (setq front-highbeam-leds (+ front-highbeam-leds 4))
         })
-        ((or (= led-rear-strip-type 3) (= led-rear-strip-type 4)) {
+        ((or (= led-rear-strip-type 4) (= led-rear-strip-type 5)) {
              (setq rear-highbeam-leds (+ rear-highbeam-leds 4))
         })
     )
@@ -317,16 +329,22 @@
     (var rear-color-highbeam 0x00)
     (var led-current-front-color '())
     (var led-current-rear-color '())
+
+    (var front-headlight-on false)
+    (var rear-headlight-on false)
     (if (and (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
         (if (>= direction 0){
             (setq front-color-highbeam (to-i(* 0xFF led-brightness-highbeam)))
             (if (> led-dim-on-highbeam-brightness 0.0) (setq led-current-brightness-front led-dim-on-highbeam-brightness))
+            (setq front-headlight-on t)
         })
         (if (< direction 0){
             (setq rear-color-highbeam (to-i(* 0xFF led-brightness-highbeam)))
             (if (> led-dim-on-highbeam-brightness 0.0) (setq led-current-brightness-rear led-dim-on-highbeam-brightness))
+            (setq rear-headlight-on t)
         })
     })
+
     (cond
         ((or (= led-front-strip-type 2) (= led-front-strip-type 3)) {
             (if (and (<= led-dim-on-highbeam-brightness 0.0) (>= direction 0) (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
@@ -351,6 +369,11 @@
                     (setq led-tmp-index (+ led-tmp-index 1))
                 })
             })
+        })
+        ((and (= led-front-strip-type 6) (>= led-front-headlight-pin 0)) {
+            (if front-headlight-on (gpio-write led-front-headlight-pin 1) (gpio-write led-front-headlight-pin 0))
+            (setq led-current-front-color led-front-color)
+            (setq led-current-brightness-front led-current-brightness)
         })
         (_ {
             (setq led-current-front-color led-front-color)
@@ -381,6 +404,11 @@
                     (setq led-tmp-index (+ led-tmp-index 1))
                 })
             })
+        })
+        ((and (= led-rear-strip-type 6) (>= led-rear-headlight-pin 0)) {
+            (if rear-headlight-on (gpio-write led-rear-headlight-pin 1) (gpio-write led-rear-headlight-pin 0))
+            (setq led-current-rear-color led-rear-color)
+            (setq led-current-brightness-rear led-current-brightness)
         })
         (_ {
             (setq led-current-rear-color led-rear-color)

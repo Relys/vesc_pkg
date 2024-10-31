@@ -1,7 +1,7 @@
 ;@const-symbol-strings
 
 ; Settings version
-(def config-version 435i32)
+(def config-version 437i32)
 ; Persistent settings
 
 ; Format: (label . (offset type default-value current-value))
@@ -81,6 +81,8 @@
     (led-fix                   . (72 i 1 -1))
     (led-show-battery-charging . (73 b 0 -1))
     (vin-chatter-threshold     . (74 i 20 -1))
+    (led-front-headlight-pin   . (75 i -1 -1))
+    (led-rear-headlight-pin    . (76 i -1 -1))
 ))
 
 ;(move-to-flash eeprom-addrs)
@@ -123,7 +125,7 @@
                     in-led-brake-light-enabled in-led-brake-light-min-amps in-idle-timeout in-idle-timeout-shutoff in-led-brightness in-led-brightness-highbeam in-led-brightness-idle in-led-brightness-status in-led-status-pin in-led-status-num
                     in-led-status-type in-led-status-reversed in-led-front-pin in-led-front-num in-led-front-type in-led-front-reversed in-led-front-strip-type
                     in-led-rear-pin in-led-rear-num in-led-rear-type in-led-rear-reversed in-led-rear-strip-type in-led-button-pin in-led-button-strip-type in-led-footpad-pin in-led-footpad-num in-led-footpad-type in-led-footpad-reversed
-                    in-led-footpad-strip-type in-bms-rs485-di-pin in-bms-rs485-do-pin in-bms-rs485-dere-pin in-bms-wakeup-pin in-bms-override-soc in-bms-rs485-chip in-led-loop-delay in-bms-loop-delay in-pubmote-loop-delay in-can-loop-delay in-led-max-blend-count in-led-startup-timeout in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging in-vin-chatter-threshold) {
+                    in-led-footpad-strip-type in-bms-rs485-di-pin in-bms-rs485-do-pin in-bms-rs485-dere-pin in-bms-wakeup-pin in-bms-override-soc in-bms-rs485-chip in-led-loop-delay in-bms-loop-delay in-pubmote-loop-delay in-can-loop-delay in-led-max-blend-count in-led-startup-timeout in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging in-vin-chatter-threshold in-led-front-headlight-pin in-led-rear-headlight-pin) {
     (if (>= led-context-id 0){
     (let ((start-time (systime))
         (timeout 100000))  ; Timeout in milliseconds (1 seconds)
@@ -203,6 +205,8 @@
     (set-config 'led-fix (to-i in-led-fix))
     (set-config 'led-show-battery-charging (to-i in-led-show-battery-charging))
     (set-config 'vin-chatter-threshold (to-i in-vin-chatter-threshold))
+    (set-config 'led-front-headlight-pin (to-i in-led-front-headlight-pin))
+    (set-config 'led-rear-headlight-pin (to-i in-led-rear-headlight-pin))
     (if (or (!= (to-i in-bms-rs485-di-pin) bms-rs485-di-pin-prev) (!= (to-i in-bms-rs485-do-pin) bms-rs485-do-pin-prev) (!= (to-i in-bms-rs485-dere-pin) bms-rs485-dere-pin-prev) (!= (to-i in-bms-wakeup-pin) bms-wakeup-pin-prev) ) {
         ;(if (init-bms) )
         ;Todo deal with validating and resetting bms pins

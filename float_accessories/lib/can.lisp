@@ -260,8 +260,8 @@
                                 ;(def beep-reason-t (shr switch-state-byte 4))
                                 (setq handtest-mode (= (bitwise-and switch-state-byte 0x08) 0x08))
 
-                                (def footpad-adc1-t (/ (bufget-u8 data 11) 50))
-                                (def footpad-adc2-t (/ (bufget-u8 data 12) 50))
+                                (def footpad-adc1-t (/ (to-float (bufget-u8 data 11)) 50))
+                                (def footpad-adc2-t (/ (to-float (bufget-u8 data 12)) 50))
 
                                 (if (= switch-state 2) {
                                     (setq switch-state 3)

@@ -301,10 +301,26 @@ Popup {
                 text: qsTr("About")
             }
         }
- TabBar {
-            id: tabBar2
-            Layout.fillWidth: true
-            visible: tabBar.currentIndex === 1
+TabBar {
+    id: tabBar2
+    Layout.fillWidth: true
+    visible: tabBar.currentIndex === 1
+
+    // Update enabled indices when checkboxes change
+    Component.onCompleted: updateEnabledIndices()
+
+    Connections {
+        target: ledEnabled
+        function onCheckedChanged() { updateEnabledIndices() }
+    }
+    Connections {
+        target: pubmoteEnabled
+        function onCheckedChanged() { updateEnabledIndices() }
+    }
+    Connections {
+        target: bmsEnabled
+        function onCheckedChanged() { updateEnabledIndices() }
+    }
             TabButton {
                 text: qsTr("LED")
                 enabled: ledEnabled.checked
@@ -509,6 +525,15 @@ ScrollView {
                         color: Utility.getAppHexColor("lightText")
                         text: "BMS Status: Unknown"
                     }
+                }
+}
+        GroupBox {
+            title: "BMS Info"
+            Layout.fillWidth: true
+            visible: bmsEnabled.checked
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 10
                     Text {
                         id: bmsError
                         Layout.fillWidth: true
@@ -1616,7 +1641,7 @@ TextArea {
 
           "<p><b>RELEASE NOTES</b></p>" +
           "<p>Now with BMS and Pubmote (beta)</p>" +
-
+          
           "<p><b>BUILD INFO</b></p>" +
           "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
     Layout.fillWidth: true
@@ -1848,6 +1873,27 @@ function makeArgStr() {
     ].join(" ");
 }
 
+    // Property to track enabled tabs
+    property var enabledIndices: []
+
+    // Update enabled indices whenever checkbox states change
+    onEnabledIndicesChanged: {
+        // If current tab is disabled, switch to first enabled tab
+        if (!enabledIndices.includes(tabBar2.currentIndex)) {
+            const firstEnabled = enabledIndices[0]
+            if (firstEnabled !== undefined) {
+                tabBar2.currentIndex = firstEnabled
+            }
+        }
+    }
+
+    function updateEnabledIndices() {
+        const newIndices = []
+        if (ledEnabled.checked) newIndices.push(0)
+        if (pubmoteEnabled.checked) newIndices.push(1)
+        if (bmsEnabled.checked) newIndices.push(2)
+        enabledIndices = newIndices
+    }
 
     function sendCode(str) {
         mCommands.sendCustomAppData(str + '\0')

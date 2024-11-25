@@ -16,10 +16,10 @@
     (esp-now-start)
     (esp-now-del-peer esp-now-remote-mac)
     (esp-now-add-peer esp-now-remote-mac)
-    ;(print (list "starting" (get-mac-addr) (wifi-get-chan)))
-    ;(print esp-now-remote-mac)
     (return true)
 })
+
+;todo more robust pairing process. Needs to keep sending packets as a missed packet can lead to invalid state machine.
 (defunret pair-pubmote (pairing) {
     (if (= (conf-get 'wifi-mode) 0) {
         (send-msg "WiFi is disabled. Please enable and reboot.")
@@ -63,7 +63,7 @@
 (defun pubmote-loop () {
     (if (init-pubmote){
         (setq pubmote-loop-delay (get-config 'pubmote-loop-delay))
-        (var next-run-time (secs-since 0))  ; Set first run time
+        (var next-run-time (secs-since 0))
         (var loop-start-time 0)
         (var loop-end-time 0)
         (var pubmote-loop-delay-sec (/ 1.0 pubmote-loop-delay))
@@ -87,13 +87,12 @@
                         (bufset-u8 pairing-data i (ix local-mac i))
                     })
                     ;(bufset-u8 data 0 69)
-                    (esp-now-send esp-now-remote-mac pairing-data) ;TODO client side
+                    (esp-now-send esp-now-remote-mac pairing-data)
                     (free pairing-data)
                     (esp-now-del-peer esp-now-remote-mac)
                     (setq pairing-state 2)
                 })
-                ;(if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0)){
-                    (if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1)){
+                (if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0)){
                     (bufset-u8 data 0 69) ; Mode
                     (bufset-u8 data 1 fault-code)
                     (bufset-i16 data 2 (floor (* pitch-angle 10)))
@@ -110,33 +109,20 @@
                     (bufset-u8 data 22 (floor (* motor-temp-filtered 2)))
                     (bufset-u32 data 23 odometer)
                     (bufset-u8 data 27 (floor (* battery-percent-remaining 2)))
-                    (bufset-i32 data 28 (get-config 'esp-now-secret-code)) ;TODO client side buffers changed
+                    (bufset-i32 data 28 (get-config 'esp-now-secret-code))
                     (esp-now-send esp-now-remote-mac data)
                 })
-                ; Capture end time and calculate actual loop time
                 (setq loop-end-time (secs-since 0))
                 (var actual-loop-time (- loop-end-time loop-start-time))
 
-                ; Timing control
-                (var time-to-wait (- next-run-time (secs-since 0)))  ; Calculate remaining time to wait in seconds
+                (var time-to-wait (- next-run-time (secs-since 0)))
 
-                ;(print (str-merge "Loop start: " (str-from-n loop-start-time "%.3f")))
-                ;(print (str-merge "Loop end: " (str-from-n loop-end-time "%.3f")))
-                ;(print (str-merge "Time to wait: " (str-from-n time-to-wait "%.3f")))
-
-                ; Adjust for negative time-to-wait
                 (if (> time-to-wait 0) {
-                    (yield (* time-to-wait 1000000))  ; Convert seconds to microseconds for yield
+                    (yield (* time-to-wait 1000000))
                 }{
-                    ; If running behind, sync next-run-time with current time to avoid drift
                     (setq next-run-time (secs-since 0))
                 })
-
-                ; Update next-run-time for the next iteration
                 (setq next-run-time (+ next-run-time pubmote-loop-delay-sec))
-
-                ; Log actual loop time for debugging
-                ;(print (str-merge "Actual loop time: " (str-from-n actual-loop-time "%.3f") " s"))
             })
         })
         (free data)
@@ -146,7 +132,7 @@
 
 (defun pubmote-rx (src des data rssi) {
     (if (get-config 'pubmote-enabled){
-        (if (and (= pairing-state 0) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) { ;TODO client side buffers changed
+        (if (and (= pairing-state 0) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) {
             (atomic {
                 (setq pubmote-last-activity-time (systime))
                 ;(print (list "Received" src des data rssi))
@@ -163,18 +149,13 @@
             })
         }{
             (if (= pairing-state 2) {
-                ;(print (get-mac-addr))
-                ;(print src)
-                ;(print (get-config 'esp-now-secret-code))
                 (setq esp-now-remote-mac src)
                 (esp-now-add-peer esp-now-remote-mac)
                 (var tmpbuf (bufcreate 4))
                 (bufset-i32 tmpbuf 0 (get-config 'esp-now-secret-code))
-                (esp-now-send esp-now-remote-mac tmpbuf) ;TODO client side
+                (esp-now-send esp-now-remote-mac tmpbuf)
                 (free tmpbuf)
                 (esp-now-del-peer esp-now-remote-mac)
-                ;(setq pairing-state 0)
-                ;(pair-pubmote -1)
             })
         })
     })

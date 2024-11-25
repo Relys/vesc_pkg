@@ -14,7 +14,7 @@ Item {
     property int pubmotePairCode: -1  // Initialize with a default invalid value
     property bool pairingTimeout: false
     property int remainingTime: 30  // Initialize with the full 30 seconds
-
+    property int bmsConnected: 0
     property Commands mCommands: VescIf.commands()
     property int floatAccessoriesMagic: 102
     property bool acceptTOS: false
@@ -22,7 +22,7 @@ Item {
         if (!(VescIf.getLastFwRxParams().hw.includes("Express") || VescIf.getLastFwRxParams().hw.includes("Avaspark")) || VescIf.getLastFwRxParams().hw.includes("rESCue")) {
             VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express, Avaspark or rESCue board", false, false)
         }
-        sendCode("f" + "(send-config)")
+        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)")
     }
 
 Timer {
@@ -31,7 +31,7 @@ Timer {
     running: true
     repeat: true
     onTriggered: {
-        sendCode("f" + "(status)")
+        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(status)")
     }
 }
     // Timer for 30-second timeout
@@ -44,7 +44,7 @@ Timer {
             remainingTime--;  // Decrease the remaining time by 1 second
             if (remainingTime <= 0) {
                 pairingTimeout = true;
-                sendCode("f(pair-pubmote -2)");  // Automatically reject if time runs out
+                sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -2)");  // Automatically reject if time runs out
                 pubmotePairPopup.close();
             }
         }
@@ -73,7 +73,7 @@ Timer {
                 pairingTimeoutTimer.start();  // Start the 1-second timer to count down
 
                 // Send the pairing request with the generated code
-                sendCode("f(pair-pubmote " + pubmotePairCode + ")");
+                sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote " + pubmotePairCode + ")");
             } else {
                 pairingTimeoutTimer.stop();  // Stop timer if the popup is closed
             }
@@ -111,7 +111,7 @@ Timer {
                     text: "Accept"
                     onClicked: {
                         if (!pairingTimeout) {
-                            sendCode("f(pair-pubmote -1)");  // Accept pairing
+                            sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -1)");  // Accept pairing
                             pubmotePairPopup.close();
                         }
                     }
@@ -120,7 +120,7 @@ Timer {
                 Button {
                     text: "Reject"
                     onClicked: {
-                        sendCode("f(pair-pubmote -2)");  // Reject pairing manually
+                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -2)");  // Reject pairing manually
                         pubmotePairPopup.close();
                     }
                 }
@@ -180,10 +180,10 @@ Popup {
                     var keyList = hexStringToLispList(keyHex);
                     var counterList = hexStringToLispList(counterHex);
 
-                    var sendKeysString = "f(send-keys " + keyList + " " + counterList + ")";
+                    var sendKeysString = "(send-keys " + keyList + " " + counterList + ")";
 
                     console.log("Sending: " + sendKeysString);
-                    sendCode(sendKeysString);
+                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + sendKeysString);
                     keySettingPopup.close();
                 } else {
                     console.error("Invalid input: Both key and counter must result in 4 uint32 values each")
@@ -267,7 +267,7 @@ Popup {
                         onClicked: {
                             acceptTOS = true
                             termsPopup.close()
-                            sendCode("f" + "(accept-tos)")
+                            sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(accept-tos)")
                         }
                     }
                 }
@@ -301,7 +301,23 @@ Popup {
                 text: qsTr("About")
             }
         }
-
+ TabBar {
+            id: tabBar2
+            Layout.fillWidth: true
+            visible: tabBar.currentIndex === 1
+            TabButton {
+                text: qsTr("LED")
+                enabled: ledEnabled.checked
+            }
+            TabButton {
+                text: qsTr("Pubmote")
+                enabled: pubmoteEnabled.checked
+            }
+            TabButton {
+                text: qsTr("BMS")
+                enabled: bmsEnabled.checked
+            }
+        }
         // Stack Layout
         StackLayout {
             id: stackLayout
@@ -321,9 +337,18 @@ ScrollView {
             interval: 500  // Half a second (500ms)
             repeat: false
             onTriggered: {
-                applyLedControlChanges()
+                applyControlChanges()
             }
         }
+
+        // Stack Layout
+        StackLayout {
+            id: stackLayout2
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: tabBar2.currentIndex
+            }
+
 
         GroupBox {
             title: "LED Control"
@@ -344,7 +369,7 @@ ScrollView {
                 }
                 ColumnLayout {
                     id: ledHighBeamLayout
-                    visible: ledOn.checked && (ledFrontStripType.currentValue > 1 || ledRearStripType.currentValue > 1)
+                    visible: ledOn.checked && (((ledFrontStripType.currentIndex > 1 && ledFrontStripType.currentIndex < 7) || (ledFrontStripType.currentIndex === 7 && ledFrontHighbeamPin.value >= 0)) || ((ledRearStripType.currentIndex > 1 && ledRearStripType.currentIndex < 7) || (ledRearStripType.currentIndex === 7 && ledRearHighbeamPin.value >= 0)))
                     spacing: 10
 
                     CheckBox {
@@ -399,7 +424,7 @@ ScrollView {
 
                         Text {
                             color: Utility.getAppHexColor("lightText")
-                            text: "Status BrightnesS"
+                            text: "Status Brightness"
                         }
 
                         Slider {
@@ -416,7 +441,7 @@ ScrollView {
 
                 ColumnLayout {
                     id: ledHighBeamBrightnessLayout
-                    visible: ledOn.checked && ledHighbeamOn.checked && (ledFrontStripType.currentValue > 3 || ledRearStripType.currentValue > 3)
+                    visible: ledOn.checked && false
                     spacing: 10
                     Text {
                         color: Utility.getAppHexColor("lightText")
@@ -435,7 +460,26 @@ ScrollView {
             }
         }
 
+        GroupBox {
+            title: "BMS Control"
+            Layout.fillWidth: true
+            visible: bmsEnabled.checked && bmsType.currentIndex >= 3
 
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 10
+                Switch {
+                    id: bmsChargeState
+                    text: "Charge BMS 90%"
+                    checked: true
+                    enabled: bmsConnected === 1
+                    onCheckedChanged: {
+                        handleDebouncedChange()
+                    }
+                }
+            }
+
+        }
         GroupBox {
             title: "Status"
             Layout.fillWidth: true
@@ -465,6 +509,24 @@ ScrollView {
                         color: Utility.getAppHexColor("lightText")
                         text: "BMS Status: Unknown"
                     }
+                    Text {
+                        id: bmsError
+                        Layout.fillWidth: true
+                        color: Utility.getAppHexColor("lightText")
+                        text: "BMS Error: None"
+                    }
+                    Text {
+                        id: bmsBatteryType
+                        Layout.fillWidth: true
+                        color: Utility.getAppHexColor("lightText")
+                        text: "Battery Type: None"
+                    }
+                    Text {
+                        id: bmsBatteryCycles
+                        Layout.fillWidth: true
+                        color: Utility.getAppHexColor("lightText")
+                        text: "Battery Cycles: None"
+                    }
                 }
 }
     }
@@ -478,7 +540,7 @@ ScrollView {
                     spacing: 10
                                 ColumnLayout {
                                     id: ledEnabledLayout
-                                    visible: ledEnabled.checked
+                                    visible: ledEnabled.checked && tabBar2.currentIndex === 0
                                     spacing: 10
                     GroupBox {
                         title: "LED General Config"
@@ -633,7 +695,7 @@ Slider {
                                     id: ledModeFootpad
                                     Layout.fillWidth: true
                                     model: [
-                                        {text: "None (Placeholder)", value: 0}
+                                        {text: "RGB Fade", value: 0}
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -653,7 +715,7 @@ Slider {
                                 CheckBox {
                                     id: ledBrakeLightEnabled
                                     text: "Brake Light"
-                                    checked: false
+                                    checked: true
                                 }
                                 CheckBox {
                                     id: ledShowBatteryCharging
@@ -844,8 +906,9 @@ SpinBox {
                                         {text: "Avaspark Laserbeam", value: 2},
                                         {text: "Avaspark Laserbeam Pint", value: 3},
                                         {text: "JetFleet H4", value: 4},
-                                        {text: "JetFleet GT", value: 5},
-                                        {text: "Stock GT", value: 6},
+                                        {text: "JetFleet H4 (no limit DCDC)", value: 5},
+                                        {text: "JetFleet GT", value: 6},
+                                        {text: "Stock GT", value: 7},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -876,17 +939,17 @@ SpinBox {
                                 }
 
                                 ColumnLayout {
-                                    id: ledFrontHeadlightPinLayout
-                                    visible: ledFrontStripType.currentValue === 6
+                                    id: ledFrontHighbeamPinLayout
+                                    visible: ledFrontStripType.currentValue === 7 || ledFrontStripType.currentValue === 1
                                     spacing: 10
 
                                     Text {
                                         color: Utility.getAppHexColor("lightText")
-                                        text: "Front Headlight Pin"
+                                        text: "Front Highbeam Pin"
                                     }
 
                                     SpinBox {
-                                        id: ledFrontHeadlightPin
+                                        id: ledFrontHighbeamPin
                                         from: -1
                                         to: 100
                                         value: -1
@@ -971,8 +1034,9 @@ SpinBox {
                                         {text: "Avaspark Laserbeam", value: 2},
                                         {text: "Avaspark Laserbeam Pint", value: 3},
                                         {text: "JetFleet H4", value: 4},
-                                        {text: "JetFleet GT", value: 5},
-                                        {text: "Stock GT", value: 6},
+                                        {text: "JetFleet H4 (no limit DCDC)", value: 5},
+                                        {text: "JetFleet GT", value: 6},
+                                        {text: "Stock GT", value: 7},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -1002,17 +1066,17 @@ SpinBox {
                                     }
                                 }
                                 ColumnLayout {
-                                    id: ledRearHeadlightPinLayout
-                                    visible: ledRearStripType.currentValue === 6
+                                    id: ledRearHighbeamPinLayout
+                                    visible: ledRearStripType.currentValue === 7 || ledRearStripType.currentValue === 1
                                     spacing: 10
 
                                     Text {
                                         color: Utility.getAppHexColor("lightText")
-                                        text: "Rear Headlight Pin"
+                                        text: "Rear Highbeam Pin"
                                     }
 
                                     SpinBox {
-                                        id: ledRearHeadlightPin
+                                        id: ledRearHighbeamPin
                                         from: -1
                                         to: 100
                                         value: -1
@@ -1092,13 +1156,12 @@ SpinBox {
                                     Layout.fillWidth: true
                                     model: [
                                         {text: "None", value: 0},
-                                        {text: "Custom", value: 1},
+                                        {text: "NeoPixel RGB", value: 1},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
                                     onCurrentIndexChanged: {
                                         value = model[currentIndex].value
-                                        updateButtonLEDSettings()
                                     }
                                     property int value: 0
                                 }
@@ -1241,7 +1304,7 @@ SpinBox {
                         title: "Pubmote Config"
                         Layout.fillWidth: true
 
-                            visible: pubmoteEnabled.checked
+                            visible: pubmoteEnabled.checked && tabBar2.currentIndex === 1
                         ColumnLayout {
                             anchors.fill: parent
                             spacing: 5
@@ -1275,7 +1338,7 @@ ColumnLayout {
                     GroupBox {
                         title: "BMS Config"
                         Layout.fillWidth: true
-                        visible: bmsEnabled.checked
+                        visible: bmsEnabled.checked && tabBar2.currentIndex === 2
                         ColumnLayout {
                             anchors.fill: parent
                             spacing: 10
@@ -1307,11 +1370,11 @@ Text {
 
                                 ColumnLayout {
                                     id: bmsSettings
-                                    visible: bmsType.currentValue > 0
+                                    visible: bmsType.currentIndex > 0
                                     spacing: 10
                                 ColumnLayout {
                                     id: bmsCryptoSettingsLayout
-                                    visible: bmsType.currentValue > 2
+                                    visible: bmsType.currentIndex > 2
                                     spacing: 10
                             Button {
                             text: "Set Keys"
@@ -1329,11 +1392,11 @@ Text {
                             }
                             Text {
                                 color: Utility.getAppHexColor("lightText")
-                                text: "RS485 DI/A Pin"
+                                text: "RS485 RO/A Pin"
                             }
 
                             SpinBox {
-                                id: bmsRs485DIPin
+                                id: bmsRs485ROPin
                                 from: -1
                                 to: 100
                                 value: -1
@@ -1345,11 +1408,11 @@ Text {
                                     spacing: 10
                             Text {
                                 color: Utility.getAppHexColor("lightText")
-                                text: "RS485 DO Pin"
+                                text: "RS485 DI Pin"
                             }
 
                             SpinBox {
-                                id: bmsRs485DOPin
+                                id: bmsRs485DIPin
                                 from: -1
                                 to: 100
                                 value: -1
@@ -1368,7 +1431,14 @@ Text {
                                 value: -1
                                 editable: true
                             }
-}
+                            Button {
+                            text: "Factory Init"
+                            //enabled: bmsConnected === 1
+                            onClicked: {
+                            bmsFactoryInit()
+                            }
+                            }
+                            }
                             CheckBox {
                                 id: bmsChargeOnly
                                 text: "Charge only (Mosfet toggle wakeup to keep alive)"
@@ -1396,6 +1466,18 @@ Text {
                                 id: bmsOverrideSOC
                                 text: "Override SOC (Voltage)"
                                 checked: false
+                            }
+
+                            Text {
+                                color: Utility.getAppHexColor("lightText")
+                                text: "BMS Buffer Size"
+                            }
+                            SpinBox {
+                                id: bmsBuffSize
+                                from: 16
+                                to: 256
+                                value: 128
+                                editable: true
                             }
                             }
                         }
@@ -1433,7 +1515,7 @@ Text {
                                     id: bmsEnabled
                                     text: "BMS Enabled"
                                     checked: false
-                                    enabled: false
+                                    enabled: true
                                 }
                                 }
                                 }
@@ -1451,7 +1533,7 @@ SpinBox {
     id: canLoopDelay
     from: 1
     to: 1000
-    value: 20
+    value: 8
     stepSize: 1
     editable: true
 }
@@ -1480,7 +1562,7 @@ SpinBox {
     id: pubmoteLoopDelay
     from: 1
     to: 1000
-    value: 20
+    value: 8
     stepSize: 1
     visible: pubmoteEnabled.checked
     editable: true
@@ -1495,7 +1577,7 @@ SpinBox {
     id: bmsLoopDelay
     from: 1
     to: 1000
-    value: 20
+    value: 8
     stepSize: 1
     visible: bmsEnabled.checked
     editable: true
@@ -1533,7 +1615,7 @@ TextArea {
           "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
 
           "<p><b>RELEASE NOTES</b></p>" +
-          "<p>LED functionality only. Requires 6.05 firmware on both the VESC and VESC Express as well as the Refloat package.</p>" +
+          "<p>Now with BMS and Pubmote (beta)</p>" +
 
           "<p><b>BUILD INFO</b></p>" +
           "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
@@ -1555,7 +1637,7 @@ TextArea {
             Button {
                 text: "Read Cfg"
                 onClicked: {
-                    sendCode("f" + "(send-config)")
+                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)")
                 }
             }
             Button {
@@ -1565,17 +1647,17 @@ TextArea {
                     termsPopup.visible = true
                 }
                     //console.log(makeArgStr())
-                    sendCode("f" + "(recv-config " + makeArgStr() + " )")
-                    sendCode("f" + "(save-config)")
-                    sendCode("f" + "(send-config)")
+                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(recv-config " + makeArgStr() + " )")
+                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(save-config)")
+                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)")
                 }
             }
 
             Button {
                 text: "Restore Defaults"
                 onClicked: {
-                    sendCode("f" + "(restore-config)")
-                    sendCode("f" + "(send-config)")
+                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(restore-config)")
+                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)")
                 }
             }
         }
@@ -1608,15 +1690,19 @@ TextArea {
                 break
             case 4: // JetFleet H4
                 ledFrontNum.value = 17
-                ledFrontType.currentIndex = 1
+                ledFrontType.currentIndex = 0
                 break
-            case 5: // JetFleet GT
-                ledFrontNum.value = 11
-                ledFrontType.currentIndex = 1
+            case 5: // JetFleet H4 (no limit)
+                ledFrontNum.value = 17
+                ledFrontType.currentIndex = 0
                 break
-            case 6: // Stock GT
+            case 6: // JetFleet GT
                 ledFrontNum.value = 11
                 ledFrontType.currentIndex = 0
+                break
+            case 7: // Stock GT
+                ledFrontNum.value = 11
+                ledFrontType.currentIndex = 2
                 break
             default:
                 // Do nothing, keep user-defined values
@@ -1630,7 +1716,7 @@ TextArea {
             case 1: // Custom
                 break
             case 2: // Avaspark Laserbeam
-                ledRearNum.value = 19
+                ledRearNum.value = 18
                 ledRearType.currentIndex = 0
                 break
             case 3: // Avaspark Laserbeam Pint
@@ -1639,31 +1725,25 @@ TextArea {
                 break
             case 4: // JetFleet H4
                 ledRearNum.value = 17
-                ledRearType.currentIndex = 1
+                ledRearType.currentIndex = 0
                 break
-            case 5: // JetFleet GT
-                ledRearNum.value = 11
-                ledRearType.currentIndex = 1
+            case 5: // JetFleet H4 (no limit)
+                ledRearNum.value = 17
+                ledRearType.currentIndex = 0
                 break
-            case 6: // Stock GT
+            case 6: // JetFleet GT
                 ledRearNum.value = 11
                 ledRearType.currentIndex = 0
+                break
+            case 7: // Stock GT
+                ledRearNum.value = 11
+                ledRearType.currentIndex = 2
                 break
             default:
                 // Do nothing, keep user-defined values
         }
     }
 
-    function updateButtonLEDSettings() {
-        switch(ledButtonStripType.value) {
-            case 0: // None
-                break
-            case 1: // Custom
-                break
-            default:
-                // Do nothing, keep user-defined values
-        }
-    }
     function updateFootpadLEDSettings() {
         switch(ledFootpadStripType.value) {
             case 0: // None
@@ -1675,14 +1755,19 @@ TextArea {
         }
     }
 
-function makeLedArgStr() {
+    function bmsFactoryInit(str) {
+        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(bms-trigger-factory-init)")
+    }
+
+function makeControlArgStr() {
     return [
         ledOn.checked * 1,
         ledHighbeamOn.checked * 1,
         parseFloat(ledBrightness.value).toFixed(2),
         parseFloat(ledBrightnessHighbeam.value).toFixed(2),
         parseFloat(ledBrightnessIdle.value).toFixed(2),
-        parseFloat(ledBrightnessStatus.value).toFixed(2)
+        parseFloat(ledBrightnessStatus.value).toFixed(2),
+        bmsChargeState.checked * 1
     ].join(" ");
 }
 
@@ -1690,9 +1775,9 @@ function makeLedArgStr() {
         debounceTimer.restart()  // Reset the timer on any change
     }
 
-    function applyLedControlChanges() {
+    function applyControlChanges() {
         //console.log("Applying LED control settings after debounce")
-        sendCode("f" + "(recv-led-control " + makeLedArgStr() + " )")
+        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(recv-control " + makeControlArgStr() + " )")
     }
 function makeArgStr() {
     return [
@@ -1738,7 +1823,7 @@ function makeArgStr() {
         ledFootpadReversed.checked * 1,
         ledFootpadStripType.currentIndex,
         bmsRs485DIPin.value,
-        bmsRs485DOPin.value,
+        bmsRs485ROPin.value,
         bmsRs485DEREPin.value,
         bmsWakeupPin.value,
         bmsOverrideSOC.checked * 1,
@@ -1756,8 +1841,9 @@ function makeArgStr() {
         ledFix.value,
         ledShowBatteryCharging.checked * 1,
         vinChatterThreshold.value,
-        ledFrontHeadlightPin.value,
-        ledRearHeadlightPin.value
+        ledFrontHighbeamPin.value,
+        ledRearHighbeamPin.value,
+        bmsBuffSize.value
 
     ].join(" ");
 }
@@ -1842,7 +1928,7 @@ function makeArgStr() {
                 }).join(":");
                 // esp-now-secret-code 48
                 bmsRs485DIPin.value = Number(tokens[49])
-                bmsRs485DOPin.value = Number(tokens[50])
+                bmsRs485ROPin.value = Number(tokens[50])
                 bmsRs485DEREPin.value = Number(tokens[51])
                 bmsWakeupPin.value = Number(tokens[52])
                 bmsOverrideSOC.checked = Number(tokens[53])
@@ -1869,8 +1955,9 @@ function makeArgStr() {
                 ledFix.value = Number(tokens[73])
                 ledShowBatteryCharging.checked = Number(tokens[74])
                 vinChatterThreshold.value = Number(tokens[75])
-                ledFrontHeadlightPin.value = Number(tokens[76])
-                ledRearHeadlightPin.value = Number(tokens[77])
+                ledFrontHighbeamPin.value = Number(tokens[76])
+                ledRearHighbeamPin.value = Number(tokens[77])
+                bmsBuffSize.value = Number(tokens[78])
 
                 pubmoteMacAddress.text = "Pubmote MAC: " + ((Number(tokens[46]) == -1) ? "Not Paired" : macAddress.toUpperCase());
             } else if (str.startsWith("msg")) {
@@ -1885,10 +1972,14 @@ function makeArgStr() {
                 var pubmoteConnected = Number(tokens[2])
                 pubmoteStatus.text = "Pubmote Status: " + (pubmoteConnected ? "Connected" : "Not Connected")
                 pubmoteStatus.color = pubmoteConnected ? "green" : "red"
-                var bmsConnected = Number(tokens[3])
+                bmsConnected = Number(tokens[3])
                 bmsStatus.text = "BMS Status: " + (bmsConnected ? "Connected" : "Not Connected")
                 bmsStatus.color = bmsConnected ? "green" : "red"
-            } else if (str.startsWith("led-control")) {
+                var bmsStatusTemp = Number(tokens[4])
+                bmsError.text = "BMS Error: " + bmsStatusTemp + "\nCharging: " + ((bmsStatusTemp & 0x20)>0) + "\nEmpty: " + ((bmsStatusTemp & 0x04)>0) + "\nTemp: " + ((bmsStatusTemp & 0x03)>0) + "\nOvercharge: " + ((bmsStatusTemp & 0x08)>0) + "\nSoC Calibration: " + ((bmsStatusTemp & 0x40)>0)
+                bmsBatteryType.text = "Battery Type: " + Number(tokens[5])
+                bmsBatteryCycles.text = "Battery Cycles: " + Number(tokens[6])
+            } else if (str.startsWith("control")) {
                 var tokens = str.split(" ")
                 ledOn.checked = Number(tokens[1])
                 ledHighbeamOn.checked = Number(tokens[2])
@@ -1896,8 +1987,9 @@ function makeArgStr() {
                 ledBrightnessHighbeam.value = parseFloat(Number(tokens[4]))
                 ledBrightnessIdle.value = Number(tokens[5])
                 ledBrightnessStatus.value = Number(tokens[6])
+                bmsChargeState.checked = Number(tokens[7])
             } else if (str.startsWith("status Settings Read")) {
-                sendCode("f" + "(send-led-control)")
+                sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-control)")
                 var msg = str.substring(7)
                 VescIf.emitStatusMessage(msg, true)
             } else if (str.startsWith("status")){

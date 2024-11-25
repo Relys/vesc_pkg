@@ -1,37 +1,22 @@
 ;@const-symbol-strings
 
 ;Future interesting functions
-;(main-init-done)
 ;(conf-detect-foc canFwd maxLoss minCurrIn maxCurrIn openloopErpm slErpm)
+;(conf-set) 'can-status-rate-hz 'foc-fw-duty-start 'foc-fw-current-max  'foc-offsets-cal-on-boot 'foc-sl-erpm-start 'foc-observer-gain 'foc-f-zv 'si-battery-ah 'si-battery-cells 'si-wheel-diameter  'si-gear-ratio  'si-motor-poles 'motor-type 'foc-sensor-mode 'l-current-min 'l-current-max 'l-abs-current-max 'l-min-vin 'l-max-vin 'l-battery-cut-start 'l-battery-cut-end 'l-temp-motor-start 'l-temp-motor-end 'l-temp-accel-dec 'bms-limit-mode 'bms-t-limit-start 'bms-t-limit-end 'bms-vmin-limit-start 'bms-vmin-limit-end 'bms-vmax-limit-start 'bms-vmax-limit-end
+;(stats 'stat-speed-max) ; Maximum speed in m/s
+;(stats-reset)
+
 ;(event-enable 'event-shutdown) ; -> event-shutdown
 ;(lbm-set-quota quota)
 ;(timeout-reset)
 ;GNSS stuff
-;(get-bms-val 'bms-soc)
-;(stats 'stat-speed-max) ; Maximum speed in m/s
-;(stats-reset)
+
 ;(reboot)
-;(conf-set) 'can-status-rate-hz 'foc-fw-duty-start 'foc-fw-current-max  'foc-offsets-cal-on-boot 'foc-sl-erpm-start 'foc-observer-gain 'foc-f-zv 'si-battery-ah 'si-battery-cells 'si-wheel-diameter  'si-gear-ratio  'si-motor-poles 'motor-type 'foc-sensor-mode 'l-current-min 'l-current-max 'l-abs-current-max 'l-min-vin 'l-max-vin 'l-battery-cut-start 'l-battery-cut-end 'l-temp-motor-start 'l-temp-motor-end 'l-temp-accel-dec 'bms-limit-mode 'bms-t-limit-start 'bms-t-limit-end 'bms-vmin-limit-start 'bms-vmin-limit-end 'bms-vmax-limit-start 'bms-vmax-limit-end
+
 (defun max (a b) (if (> a b) a b))
 (defun min (a b) (if (< a b) a b))
 
-;(defun bufget-f32-auto (buffer index) {
-;    (var value (bufget-u32 buffer index 'big-endian))
-;    (var result 0.0)
-;
-;    (var sign (if (= (bitwise-and value 0x80000000) 0u32) 1 -1))
-;    (var expo (bitwise-and (shr value 23) 0xFF))
-;    (var sig (bitwise-and value 0x7FFFFF))
-;
-;    (if (= expo 0) {
-;        (setq result 0.0)
-;    } {
-;        (var sig-f (+ (/ sig 16777216.0) 0.5))
-;        (setq result (* sign sig-f (pow 2.0 (- expo 126))))
-;        ;; Apply scaling factor
-;        (setq result (* result 71.75))
-;    })
-;})
+(defun print-hex (data) (print (map (fn (x) (bufget-u8 data x)) (range (buflen data)))))
 
 (defun event-handler ()
     (loopwhile t
@@ -52,12 +37,13 @@
 )
 
 (defun mklist (len val) (map (fn (x) val) (range len)))
-;; Split list function
+
 (defun split-list (lst n)
   (if (eq lst nil)
       nil
       (cons (take lst n)
             (split-list (drop lst n) n))))
+
 (defunret pack-bytes-to-uint32 (byte-list) {
   (return (to-u32 (+ (shl (to-u32 (ix byte-list 0)) 24)
                      (shl (to-u32 (ix byte-list 1)) 16)

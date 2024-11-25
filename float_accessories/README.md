@@ -18,10 +18,10 @@ My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a>
 
 <H2>RELEASE NOTES</H2>
 
-LED functionality only. Requires 6.05 firmware on both the VESC and VESC Express as well as the Refloat package.
+Now with BMS and Pubmote (beta)
 
 <H3>BUILD INFO</H3>
 
-Version 1.1
+Version 2.0
 
 Source code can be found here:  <a href='https://github.com/relys/vesc%5Fpkg'>https://github.com/relys/vesc_pkg</a>

@@ -9,7 +9,9 @@
 (def knight-rider-direction 1)
 (def rainbow-index 0)
 (def rainbow-button-index 0)
+(def rainbow-footpad-index 0)
 (def felony-index 0)
+
 (defun led-float-disabled (led-color) {
     (var led-num (length led-color))
     (var start (floor (/ led-num 4.0)))
@@ -41,7 +43,7 @@
 
 (defun rave-pattern (type){
     (var current-color (ix rave-colors rave-index))
-    (set-led-strip-color led-front-color (if (= type 0) current-color 0xFF000000))
+    (set-led-strip-color led-front-color (if (= type 0) current-color 0xFFFFFFFF))
     (set-led-strip-color led-rear-color current-color)
     (setq rave-index (mod (+ rave-index 1) 6))
 })
@@ -61,32 +63,37 @@
     (setq knight-rider-direction (* knight-rider-direction -1)))
 })
 
-; Battery LED strip based on the current voltage
 (defun battery-pattern (color-list) {
     (var led-num (length color-list))
     (var num-lit-leds (floor (* led-num battery-percent-remaining)))
+
     (looprange led-index 0 led-num {
-        (var red 0)
-        (var green 0)
-        (if (or (< led-index num-lit-leds) (and (= led-index 0) (<= num-lit-leds 1))) {
-            (if (or (< battery-percent-remaining 0.2) (and (= led-index 0) (<= num-lit-leds 1))) {
-                (setq red 255)
-                (setq green 0)
-            }{
-                (setq red (floor (* 255 (- 1 (/ battery-percent-remaining 0.8)))))
-                (setq green (floor (* 255 (/ battery-percent-remaining 0.8))))
-            })
-        }{
-            (setq red 0)
-            (setq green 0)
-        })
-        (var color 0x00)
-        (setq color (bits-enc-int color 16 red 8))
-        (setq color (bits-enc-int color 8 green 8))
+        (var color
+            (if (or (< led-index num-lit-leds)
+                   (and (= led-index 0) (<= num-lit-leds 1))) {
+                ; LED should be lit
+                (if (or (< battery-percent-remaining 0.2)
+                       (and (= led-index 0) (<= num-lit-leds 1))) {
+                    ; Low battery - red color
+                    (color-make 255 0 0)
+                } {
+                    ; Normal battery - gradient from green to yellow to red
+                    (let ((red-ratio (- 1 (/ battery-percent-remaining 0.8)))
+                          (green-ratio (/ battery-percent-remaining 0.8))) {
+                        (color-make
+                            (* 255 red-ratio)
+                            (* 255 green-ratio)
+                            0)
+                    })
+                })
+            } {
+                ; LED should be off
+                (color-make 0 0 0)
+            }))
         (setix color-list led-index color)
     })
 })
-; Update the rainbow LED effect on the front and rear LED strips
+
 (defun rainbow-pattern () {
     (var num-colors (length rainbow-colors))
     (looprange led-index 0 (length led-front-color) {
@@ -108,6 +115,16 @@
     (var color (ix rainbow-colors color-index))
     (setix led-button-color 0 (ix rainbow-colors color-index))
     (setq rainbow-button-index (mod (+ rainbow-button-index 1) num-colors))
+})
+
+(defun rainbow-footpad (){
+    (var num-colors (length rainbow-colors))
+    (looprange led-index 0 (length led-footpad-color) {
+        (var color-index (mod (+ rainbow-index led-index (length led-footpad-color)) num-colors))
+        (var color (ix rainbow-colors color-index))
+        (setix led-footpad-color led-index color)
+    })
+    (setq rainbow-footpad-index (mod (+ rainbow-index 1) num-colors))
 })
 
 (defun felony-pattern () {
@@ -154,29 +171,30 @@
     (setq felony-index (mod (+ felony-index 1) 3))
 })
 
-(defun duty-cycle-pattern () {
+(defun duty-cycle-pattern (color-list) {
     (var scaled-duty-cycle (* (abs duty-cycle-now) 1.1112))
     (var clamped-duty-cycle 0.0)
 
     (if (< scaled-duty-cycle 1.0) {
         (setq clamped-duty-cycle scaled-duty-cycle)
-    } {;else
+    } {
         (setq clamped-duty-cycle 1.0)
     })
+    (var led-num (length color-list))
+    (var duty-leds (floor (* clamped-duty-cycle led-num)))
 
-    (var duty-leds (floor (* clamped-duty-cycle led-status-num)))
     (var duty-color 0x00FFFF00u32)
 
     (if (> (abs duty-cycle-now) 0.85) {
         (setq duty-color 0x00FF0000u32)
-    } {;else if
+    } {
         (if (> (abs duty-cycle-now) 0.7) {
             (setq duty-color 0x00FF8800u32)
         })
     })
 
-    (looprange led-index 0 led-status-num {
-        (setix led-status-color led-index (if (< led-index duty-leds) duty-color 0x00000000u32))
+    (looprange led-index 0 led-num {
+        (setix color-list led-index (if (< led-index duty-leds) duty-color 0x00000000u32))
     })
 })
 

@@ -8,7 +8,7 @@
 (def led-combined-buffer)
 @const-start
 
-(def led-loop-delay)  ; Loop delay in microseconds (100ms)
+(def led-loop-delay)
 ;config vars
 (def led-enabled)
 (def led-on)
@@ -61,23 +61,27 @@
 (def led-rear-color '())
 (def led-button-color '())
 (def led-footpad-color '())
-(def next-run-time)  ; Set first run time after initial delay
+(def next-run-time)
 (def direction)
 (def led-mall-grab)
 (def prev-led-front-color '())
 (def prev-led-rear-color '())
+(def prev-led-footpad-color '())
 (def target-led-front-color '())
 (def target-led-rear-color '())
+(def target-led-footpad-color '())
 (def prev-led-button-color '())
 (def target-led-button-color '())
 (def combined-pins nil)
 (def led-fix 1)
 (def led-show-battery-charging 0)
-(def led-front-headlight-pin)
-(def led-rear-headlight-pin)
+(def led-front-highbeam-pin)
+(def led-rear-highbeam-pin)
+(def mall-grab-start t)
+(def mall-grab-button-timer 0)
+(def mall-grab-event t)
 
 (defun load-led-settings () {
-; Setting up all variables with get-config to fetch from EEPROM
     (setq led-enabled (get-config 'led-enabled))
     (setq led-on (get-config 'led-on))
     (setq led-highbeam-on (get-config 'led-highbeam-on))
@@ -124,8 +128,8 @@
     (setq led-loop-delay (get-config 'led-loop-delay))
     (setq led-fix (get-config 'led-fix))
     (setq led-show-battery-charging (get-config 'led-show-battery-charging))
-    (setq led-front-headlight-pin (get-config 'led-front-headlight-pin))
-    (setq led-rear-headlight-pin (get-config 'led-front-headlight-pin))
+    (setq led-front-highbeam-pin (get-config 'led-front-highbeam-pin))
+    (setq led-rear-highbeam-pin (get-config 'led-front-highbeam-pin))
 })
 
 (defun init-led-vars () {
@@ -141,21 +145,22 @@
     (setq led-mall-grab 0)
     (setq prev-led-front-color (mklist led-front-num 0))
     (setq prev-led-rear-color (mklist led-rear-num 0))
+    (setq prev-led-footpad-color (mklist led-footpad-num 0))
     (setq target-led-front-color (mklist led-front-num 0))
     (setq target-led-rear-color (mklist led-rear-num 0))
+    (setq target-led-footpad-color (mklist led-footpad-num 0))
     (setq prev-led-button-color (mklist 1 0))
     (setq target-led-button-color (mklist 1 0))
     (if (>= led-button-pin 0) {
         (setq led-button-buffer (rgbled-buffer 1 0))
     })
-    ;Update footpad
 
-    (if (and (= led-front-strip-type 6) (>= led-front-headlight-pin 0)) {
-        (gpio-configure led-front-headlight-pin 'pin-mode-out)
+    (if (and (or (= led-front-strip-type 1) (= led-front-strip-type 7)) (>= led-front-highbeam-pin 0)) {
+        (gpio-configure led-front-highbeam-pin 'pin-mode-out)
     })
 
-    (if (and (= led-rear-strip-type 6) (>= led-rear-headlight-pin 0)) {
-        (gpio-configure led-rear-headlight-pin 'pin-mode-out)
+    (if (and (or (= led-rear-strip-type 1) (= led-rear-strip-type 7)) (>= led-rear-highbeam-pin 0)) {
+        (gpio-configure led-rear-highbeam-pin 'pin-mode-out)
     })
 
     (var front-highbeam-leds 0)
@@ -167,10 +172,10 @@
         ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3)) {
              (setq rear-highbeam-leds (+ rear-highbeam-leds 1))
         })
-        ((or (= led-front-strip-type 4) (= led-front-strip-type 5)) {
+        ((or (= led-front-strip-type 4) (= led-front-strip-type 5) (= led-front-strip-type 6)) {
              (setq front-highbeam-leds (+ front-highbeam-leds 4))
         })
-        ((or (= led-rear-strip-type 4) (= led-rear-strip-type 5)) {
+        ((or (= led-rear-strip-type 4) (= led-rear-strip-type 5) (= led-rear-strip-type 6)) {
              (setq rear-highbeam-leds (+ rear-highbeam-leds 4))
         })
     )
@@ -212,7 +217,7 @@
 (defun led-loop () {
     (load-led-settings)
     (init-led-vars)
-    (var next-run-time (secs-since 0))  ; Set first run time
+    (var next-run-time (secs-since 0))
     (var loop-start-time 0)
     (var loop-end-time 0)
     (var led-loop-delay-sec (/ 1.0 led-loop-delay))
@@ -253,50 +258,53 @@
                 })
             })
         })
-        (if (= led-mall-grab-enabled 1) {
-            ;check if we have pitch-angle instead of duty
-            (if (and (not (and (>= state 1) (<= state 5))) (> pitch-angle 70)) (setq led-mall-grab 1) (setq led-mall-grab 0))
+
+        (if (and (not (running-state)) (> pitch-angle 70)){
+            (if (= led-mall-grab-enabled 1) (setq led-mall-grab 1) (setq led-mall-grab 0))
+            (if (= switch-state 3){
+                (if mall-grab-start {
+                    (setq mall-grab-button-timer (systime))
+                    (setq mall-grab-start nil)
+                    (setq mall-grab-event t)
+                })
+                (if (>= (secs-since mall-grab-button-timer) 1) {
+                    (if mall-grab-event {
+                        (setq led-on (if (= led-on 1) 0 1))
+                        (setq mall-grab-event nil)
+                    })
+                })
+            }{
+                (setq mall-grab-start t)
+            })
+        }{
+            (setq led-mall-grab 0)
         })
 
         (if (or (running-state) (= led-mall-grab 1) (display-battery-charging)) {
             (setq led-last-activity-time (systime))
-        } {
+        }{
             (setq direction 1)
         })
 
         (update-leds (secs-since led-last-activity-time))
         (led-flush-buffers)
 
-        ; Capture end time and calculate actual loop time
         (setq loop-end-time (secs-since 0))
         (var actual-loop-time (- loop-end-time loop-start-time))
 
-        ; Timing control
-        (var time-to-wait (- next-run-time (secs-since 0)))  ; Calculate remaining time to wait in seconds
-
-       ; (print (str-merge "Loop start: " (str-from-n loop-start-time "%.3f")))
-        ;(print (str-merge "Loop end: " (str-from-n loop-end-time "%.3f")))
-        ;(print (str-merge "Time to wait: " (str-from-n time-to-wait "%.3f")))
-
-        ; Adjust for negative time-to-wait
+        (var time-to-wait (- next-run-time (secs-since 0)))
         (if (> time-to-wait 0) {
 
-            (yield (* time-to-wait 1000000))  ; Convert seconds to microseconds for yield
+            (yield (* time-to-wait 1000000))
         } {
-            ; If running behind, sync next-run-time with current time to avoid drift
             (setq next-run-time (secs-since 0))
         })
 
-        ; Update next-run-time for the next iteration
         (setq next-run-time (+ next-run-time led-loop-delay-sec))
-
-        ; Log actual loop time for debugging
-        ;(print (str-merge "Actual loop time: " (str-from-n actual-loop-time "%.3f") " s"))
     })
-    ;Exit process
     (clear-leds)
     (led-flush-buffers)
-    ;(rgbled-deinit)
+    (rgbled-deinit)
     (setq led-exit-flag nil)
 })
 
@@ -330,18 +338,20 @@
     (var led-current-front-color '())
     (var led-current-rear-color '())
 
-    (var front-headlight-on false)
-    (var rear-headlight-on false)
+    (var front-highbeam-on false)
+    (var rear-highbeam-on false)
     (if (and (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
         (if (>= direction 0){
-            (setq front-color-highbeam (to-i(* 0xFF led-brightness-highbeam)))
+            ;(setq front-color-highbeam (to-i(* 0xFF led-brightness-highbeam))) ; TODO Resolve this if need support in future. Set to 0xFF for JetFleet
+            (setq front-color-highbeam 0xFF)
             (if (> led-dim-on-highbeam-brightness 0.0) (setq led-current-brightness-front led-dim-on-highbeam-brightness))
-            (setq front-headlight-on t)
+            (setq front-highbeam-on t)
         })
         (if (< direction 0){
-            (setq rear-color-highbeam (to-i(* 0xFF led-brightness-highbeam)))
+            ;(setq rear-color-highbeam (to-i(* 0xFF led-brightness-highbeam)))
+            (setq rear-color-highbeam 0xFF)
             (if (> led-dim-on-highbeam-brightness 0.0) (setq led-current-brightness-rear led-dim-on-highbeam-brightness))
-            (setq rear-headlight-on t)
+            (setq rear-highbeam-on t)
         })
     })
 
@@ -353,12 +363,13 @@
                 (setq led-current-front-color (append (list front-color-highbeam) (take led-front-color led-front-num)))
             })
         })
-        ((or (= led-front-strip-type 4) (= led-front-strip-type 5)) {
+        ((or (= led-front-strip-type 4) (= led-front-strip-type 5) (= led-front-strip-type 6)) {
             (var led-tmp (take led-front-color (length led-front-color)))
-            (setq led-current-front-color (mklist (+ (length led-front-color)4) 0))
+            (setq led-current-front-color (mklist (+ (length led-front-color) 4) 0))
             (var led-tmp-index 0)
-            (looprange k 0 (length led-front-color){
-                (if (or (and (= led-front-strip-type 4) (or (= k 2) (= k 7) (= k 13) (= k 18))) (and (= led-front-strip-type 5) (or (= k 1) (= k 5) (= k 10) (= k 3)))) {
+            (setq led-current-brightness-front (+ 60.0 (* (if (= led-front-strip-type 4) 20 40) led-current-brightness-front))) ; Maps 0-1 to 60-100
+            (looprange k 0 (length led-current-front-color){
+                (if (or (and (or (= led-front-strip-type 4) (= led-front-strip-type 5)) (or (= k 2) (= k 7) (= k 13) (= k 18))) (and (= led-front-strip-type 6) (or (= k 1) (= k 4) (= k 10) (= k 13)))) {
                     (setix led-current-front-color k front-color-highbeam)
                 }{
                     (if (and (<= led-dim-on-highbeam-brightness 0.0) (>= direction 0) (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
@@ -370,8 +381,8 @@
                 })
             })
         })
-        ((and (= led-front-strip-type 6) (>= led-front-headlight-pin 0)) {
-            (if front-headlight-on (gpio-write led-front-headlight-pin 1) (gpio-write led-front-headlight-pin 0))
+        ((and (or (= led-front-strip-type 1) (= led-front-strip-type 7)) (>= led-front-highbeam-pin 0)) {
+            (if front-highbeam-on (gpio-write led-front-highbeam-pin 1) (gpio-write led-front-highbeam-pin 0))
             (setq led-current-front-color led-front-color)
             (setq led-current-brightness-front led-current-brightness)
         })
@@ -388,12 +399,13 @@
                 (setq led-current-rear-color (append (list rear-color-highbeam) (take led-rear-color led-rear-num)))
             })
         })
-        ((or (= led-rear-strip-type 4) (= led-rear-strip-type 5)) {
+        ((or (= led-rear-strip-type 4) (= led-rear-strip-type 5) (= led-rear-strip-type 6)) {
             (var led-tmp (take led-rear-color (length led-rear-color)))
             (setq led-current-rear-color (mklist (+ (length led-rear-color) 4) 0))
             (var led-tmp-index 0)
-            (looprange k 0 (length led-rear-color){
-                (if (or (and (= led-rear-strip-type 4) (or (= k 2) (= k 7) (= k 13) (= k 18))) (and (= led-rear-strip-type 5) (or (= k 1) (= k 5) (= k 10) (= k 3)))) {
+            (setq led-current-brightness-rear (+ 60.0 (* (if (= led-rear-strip-type 4) 20 40) led-current-brightness-rear))) ; Maps 0-1 to 60-100
+            (looprange k 0 (length led-current-rear-color){
+                (if (or (and (or (= led-rear-strip-type 4) (= led-rear-strip-type 5)) (or (= k 2) (= k 7) (= k 13) (= k 18))) (and (= led-rear-strip-type 6) (or (= k 1) (= k 4) (= k 10) (= k 13) ))) {
                     (setix led-current-rear-color k rear-color-highbeam)
                 }{
                     (if (and (<= led-dim-on-highbeam-brightness 0.0) (< direction 0) (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
@@ -405,8 +417,8 @@
                 })
             })
         })
-        ((and (= led-rear-strip-type 6) (>= led-rear-headlight-pin 0)) {
-            (if rear-headlight-on (gpio-write led-rear-headlight-pin 1) (gpio-write led-rear-headlight-pin 0))
+        ((and (or (= led-rear-strip-type 1) (= led-rear-strip-type 7)) (>= led-rear-highbeam-pin 0)) {
+            (if rear-highbeam-on (gpio-write led-rear-highbeam-pin 1) (gpio-write led-rear-highbeam-pin 0))
             (setq led-current-rear-color led-rear-color)
             (setq led-current-brightness-rear led-current-brightness)
         })
@@ -415,15 +427,12 @@
             (setq led-current-brightness-rear led-current-brightness)
         })
     )
-
-    ;update
     (if (and (> led-button-strip-type 0) (>= led-button-pin 0)) {
         (rgbled-color led-button-buffer 0 led-button-color led-current-brightness)
         (rgbled-init led-button-pin 0)
         (yield led-fix)
         (rgbled-update led-button-buffer)
     })
-    ;Update footpad
 
     (if (and (> led-footpad-strip-type 0) (>= led-footpad-pin 0)) {
         (rgbled-color led-footpad-buffer 0 led-footpad-color led-current-brightness)
@@ -452,7 +461,7 @@
         }{
             (if (and (> led-status-strip-type 0) (> led-rear-strip-type 0) (>= led-status-pin 0) (= led-status-pin led-rear-pin)) {
                 (if (!= led-status-type led-rear-type)
-                    (swap-rg led-status-color); Fix for avaspark rgb when there's different types. e.g. stock GT RGBW
+                    (swap-rg led-status-color); Fix for avaspark rgb when there's different type like rgb and grb chained together.
                 )
                 (var led-combined-color (append led-status-color led-current-rear-color))
                 (var total-leds (length led-combined-color))
@@ -485,15 +494,15 @@
     })
 })
 
-(defun update-status-leds () {
-    (if (or (= state 15) handtest-mode) {
+(defun update-status-leds (can-last-activity-time-sec) {
+    (if (or (= state 15) handtest-mode (>= can-last-activity-time-sec 1) (< can-id 0)) {
         (led-float-disabled led-status-color)
     }{
         (if (> rpm 250.0){
-            (duty-cycle-pattern)
+            (duty-cycle-pattern led-status-color)
         }{
             (if (and (!= switch-state 1) (!= switch-state 2) (!= switch-state 3)){
-                ;(if (display-battery-charging) {
+                ;(if (display-battery-charging) { TODO
                 ;    ;Do something
                 ;}{
                     (battery-pattern led-status-color)
@@ -516,7 +525,7 @@
 (defun update-leds (last-activity-sec) {
     (var can-last-activity-time-sec (secs-since can-last-activity-time))
     (if (> (length led-status-color) 0){
-        (if (= led-mode-status 0) (update-status-leds))
+        (if (= led-mode-status 0) (update-status-leds can-last-activity-time-sec))
     })
     (var current-led-mode led-mode)
     (setq led-current-brightness led-brightness)
@@ -526,91 +535,98 @@
     })
 
     (if (and (<= (secs-since 0) led-startup-timeout) (not (running-state) )) { (setq current-led-mode led-mode-startup)})
-    ; Blend colors
     (var blend-ratio (/ blend-count led-max-blend-count))
-    ;(if (<= current-led-mode 5){
         (looprange i 0 (length led-front-color) {
             (setix led-front-color i (color-mix (ix prev-led-front-color i) (ix target-led-front-color i)  blend-ratio))
         })
         (looprange i 0 (length led-rear-color) {
             (setix led-rear-color i (color-mix (ix prev-led-rear-color i) (ix target-led-rear-color i)  blend-ratio))
         })
-    ;})
+        (looprange i 0 (length led-footpad-color) {
+            (setix led-footpad-color i (color-mix (ix prev-led-footpad-color i) (ix target-led-footpad-color i)  blend-ratio))
+        })
     (setix led-button-color 0 (color-mix (ix prev-led-button-color 0) (ix target-led-button-color 0)  blend-ratio))
     (setq blend-count (+ blend-count 1.0))
     ; Reset blend count and update colors when max count is reached
     (if (> blend-count led-max-blend-count) {
         (setq prev-led-front-color (take target-led-front-color (length target-led-front-color)))
         (setq prev-led-rear-color (take target-led-rear-color (length target-led-rear-color)))
+        (setq prev-led-footpad-color (take target-led-footpad-color (length target-led-footpad-color)))
         (setq prev-led-button-color (take target-led-button-color (length target-led-button-color)))
-        (if (= led-on 1) { ;put this in update-leds so we can have led-button before so it always gets updated regardless of state
-        (if (and (> (length led-front-color) 0) (> (length led-rear-color) 0)){
-            (cond
-                ((or (= state 15) handtest-mode) {
-                    (clear-leds)
-                    (led-float-disabled led-status-color)
-                    (led-float-disabled led-front-color)
+        ;TODO Put mall grab stuff here, since should happen even if led is off. also make sure it works if it's timeout
+        (if (= led-on 1) {
+            (if (> (length led-footpad-color) 0){
+                (cond
+                    ((= led-mode-footpad 0) {
+                        (rainbow-footpad)
+                    })
+                )
+            })
+            (if (and (> (length led-front-color) 0) (> (length led-rear-color) 0)){
+                (cond
+                    ((or (= state 15) handtest-mode) {
+                        (clear-leds)
+                        (led-float-disabled led-status-color)
+                        (led-float-disabled led-front-color)
+                    })
+                    ((and (> last-activity-sec idle-timeout-shutoff) (< can-last-activity-time-sec 1) (!= state 5)){;make sure we dont' clear if we loose can bus
+                        (clear-leds)
+                    })
+                    ((and (or (= current-led-mode 1) (= led-mall-grab 1)) (< can-last-activity-time-sec 1)) {
+                        (battery-pattern led-front-color)
+                        (battery-pattern led-rear-color)
+                    })
+                    ((or (= current-led-mode 0) (and (> can-last-activity-time-sec 1) (> (secs-since 0) led-startup-timeout))) {
+                        (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0xFFFFFFFFu32);todo add led-front-rgb-val
+                        (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x00FF0000u32)
+                    })
+                    ((= current-led-mode 2) {
+                        (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0x0000FFFFu32)
+                        (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x00FF00FFu32)
+                    })
+                    ((= current-led-mode 3) {
+                        (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0x000000FFu32)
+                        (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x0000FF00u32)
+                    })
+                    ((= current-led-mode 4) {
+                        (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0x00FFFF00u32)
+                        (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x0000FF00u32)
+                    })
+                    ((= current-led-mode 5) {
+                        (rainbow-pattern)
+                    })
+                    ((= current-led-mode 6) {
+                        (strobe-pattern)
+                    })
+                    ((= current-led-mode 7) {
+                        (rave-pattern 0)
+                    })
+                    ((= current-led-mode 8) {
+                        (rave-pattern 1)
+                    })
+                    ((= current-led-mode 9) {
+                        (knight-rider-pattern)
+                    })
+                    ((= current-led-mode 10) {
+                        (felony-pattern)
+                    })
+                )
+                (if (and (= led-brake-light-enabled 1) (running-state) (!= state 5) (<= tot-current led-brake-light-min-amps)){
+                    (if (>= direction 0){
+                        (brake-pattern led-rear-color)
+                    }{
+                        (brake-pattern led-front-color)
+                    })
                 })
-                ((and (> last-activity-sec idle-timeout-shutoff) (< can-last-activity-time-sec 1) (!= state 5)){;make sure we dont' clear if we loose can bus
-                    (clear-leds)
-                })
-                ((and (or (= current-led-mode 1) (= led-mall-grab 1)) (< can-last-activity-time-sec 1)) {
+
+                (if (display-battery-charging) {
                     (battery-pattern led-front-color)
                     (battery-pattern led-rear-color)
                 })
-                ((or (= current-led-mode 0) (and (> can-last-activity-time-sec 1) (> (secs-since 0) led-startup-timeout))) {
-                    (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0xFFFFFFFFu32)
-                    (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x00FF0000u32)
-                    ;(print "hi")
-                })
-                ((= current-led-mode 2) {
-                    (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0x0000FFFFu32)
-                    (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x00FF00FFu32)
-                })
-                ((= current-led-mode 3) {
-                    (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0x000000FFu32)
-                    (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x0000FF00u32)
-                })
-                ((= current-led-mode 4) {
-                    (set-led-strip-color (if (> direction 0) led-front-color led-rear-color) 0x00FFFF00u32)
-                    (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x0000FF00u32)
-                })
-                ((= current-led-mode 5) {
-                    (rainbow-pattern)
-                })
-                ((= current-led-mode 6) {
-                    (strobe-pattern)
-                })
-                ((= current-led-mode 7) {
-                    (rave-pattern 0)
-                })
-                ((= current-led-mode 8) {
-                    (rave-pattern 1)
-                })
-                ((= current-led-mode 9) {
-                    (knight-rider-pattern)
-                })
-                ((= current-led-mode 10) {
-                    (felony-pattern)
-                })
-            )
-        (if (and (= led-brake-light-enabled 1) (running-state) (!= state 5) (<= tot-current led-brake-light-min-amps)){
-            (if (>= direction 0){
-                (brake-pattern led-rear-color)
-            }{
-                (brake-pattern led-front-color)
             })
-        })
-        (if (display-battery-charging) {
-            ;do something
-            (battery-pattern led-front-color)
-            (battery-pattern led-rear-color)
-        })
-        })
         }{
             (clear-leds)
         })
-        ; Update button LED
         (update-button-led)
         (setq target-led-front-color (take led-front-color (length led-front-color)))
         (setq target-led-rear-color (take led-rear-color (length led-rear-color)))
@@ -618,31 +634,23 @@
         (setq blend-count 1.0)  ; Reset blend count for new transition
         ; Blend colors
         (var blend-ratio (if (> blend-count 0) (/ blend-count led-max-blend-count) 0.0))
-        ;(if (<= current-led-mode 5){
             (looprange i 0 (length led-front-color) {
                 (setix led-front-color i (color-mix (ix prev-led-front-color i) (ix target-led-front-color i)  blend-ratio))
-                ;(print blend-ratio)
             })
             (looprange i 0 (length led-rear-color) {
                 (setix led-rear-color i (color-mix (ix prev-led-rear-color i) (ix target-led-rear-color i)  blend-ratio))
             })
-        ;})
+            (looprange i 0 (length led-footpad-color) {
+                (setix led-footpad-color i (color-mix (ix prev-led-footpad-color i) (ix target-led-footpad-color i)  blend-ratio))
+            })
+
         (setix led-button-color 0 (color-mix (ix prev-led-button-color 0) (ix target-led-button-color 0)  blend-ratio))
     })
 })
 
 (defun clear-leds () {
-    (set-led-strip-color led-status-color 0x00)
     (set-led-strip-color led-front-color 0x00)
     (set-led-strip-color led-rear-color 0x00)
     (set-led-strip-color led-footpad-color 0x00)
 })
-
-;(defun number-in-list-p (number lst)
-;  (if (eq lst nil)
-;      nil
-;    (if (eq number (car lst))
-;        t
-;      (number-in-list-p number (cdr lst)))))
-
 @const-end

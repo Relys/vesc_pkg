@@ -155,12 +155,12 @@
         (setq led-button-buffer (rgbled-buffer 1 0))
     })
 
-    (if (and (or (= led-front-strip-type 1) (= led-front-strip-type 7)) (>= led-front-highbeam-pin 0)) {
-        (gpio-configure led-front-highbeam-pin 'pin-mode-out)
+    (if (and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) {
+        (pwm-start 2000 0.0 0 led-front-highbeam-pin 12)
     })
 
-    (if (and (or (= led-rear-strip-type 1) (= led-rear-strip-type 7)) (>= led-rear-highbeam-pin 0)) {
-        (gpio-configure led-rear-highbeam-pin 'pin-mode-out)
+    (if (and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) {
+        (pwm-start 2000 0.0 1 led-rear-highbeam-pin 12)
     })
 
     (var front-highbeam-leds 0)
@@ -305,6 +305,8 @@
     (clear-leds)
     (led-flush-buffers)
     (rgbled-deinit)
+    (pwm-stop 0)
+    (pwm-stop 1)
     (setq led-exit-flag nil)
 })
 
@@ -342,13 +344,11 @@
     (var rear-highbeam-on false)
     (if (and (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
         (if (>= direction 0){
-            ;(setq front-color-highbeam (to-i(* 0xFF led-brightness-highbeam))) ; TODO Resolve this if need support in future. Set to 0xFF for JetFleet
             (setq front-color-highbeam 0xFF)
             (if (> led-dim-on-highbeam-brightness 0.0) (setq led-current-brightness-front led-dim-on-highbeam-brightness))
             (setq front-highbeam-on t)
         })
         (if (< direction 0){
-            ;(setq rear-color-highbeam (to-i(* 0xFF led-brightness-highbeam)))
             (setq rear-color-highbeam 0xFF)
             (if (> led-dim-on-highbeam-brightness 0.0) (setq led-current-brightness-rear led-dim-on-highbeam-brightness))
             (setq rear-highbeam-on t)
@@ -381,8 +381,8 @@
                 })
             })
         })
-        ((and (or (= led-front-strip-type 1) (= led-front-strip-type 7)) (>= led-front-highbeam-pin 0)) {
-            (if front-highbeam-on (gpio-write led-front-highbeam-pin 1) (gpio-write led-front-highbeam-pin 0))
+        ((and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) {
+            (if front-highbeam-on (pwm-set-duty led-brightness-highbeam 0) (pwm-set-duty 0.0 0))
             (setq led-current-front-color led-front-color)
             (setq led-current-brightness-front led-current-brightness)
         })
@@ -417,8 +417,8 @@
                 })
             })
         })
-        ((and (or (= led-rear-strip-type 1) (= led-rear-strip-type 7)) (>= led-rear-highbeam-pin 0)) {
-            (if rear-highbeam-on (gpio-write led-rear-highbeam-pin 1) (gpio-write led-rear-highbeam-pin 0))
+        ((and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) {
+            (if rear-highbeam-on (pwm-set-duty led-brightness-highbeam 1) (pwm-set-duty 0.0 1))
             (setq led-current-rear-color led-rear-color)
             (setq led-current-brightness-rear led-current-brightness)
         })

@@ -30,20 +30,20 @@
     (led-brightness-highbeam   . (21 f 0.5 -1))
     (led-brightness-idle       . (22 f 0.3 -1))
     (led-brightness-status     . (23 f 0.6 -1))
-    (led-status-pin            . (24 i 7 -1))
+    (led-status-pin            . (24 i 9 -1))
     (led-status-num            . (25 i 10 -1))
     (led-status-type           . (26 i 0 -1))
     (led-status-reversed       . (27 b 0 -1))
-    (led-front-pin             . (28 i 8 -1))
-    (led-front-num             . (29 i 18 -1))
-    (led-front-type            . (30 i 0 -1))
-    (led-front-reversed        . (31 b 0 -1))
-    (led-front-strip-type      . (32 b 2 -1))
-    (led-rear-pin              . (33 i 9 -1))
-    (led-rear-num              . (34 i 18 -1))
-    (led-rear-type             . (35 i 0 -1))
+    (led-front-pin             . (28 i 15 -1))
+    (led-front-num             . (29 i 11 -1))
+    (led-front-type            . (30 i 2 -1))
+    (led-front-reversed        . (31 b 1 -1))
+    (led-front-strip-type      . (32 b 7 -1))
+    (led-rear-pin              . (33 i 12 -1))
+    (led-rear-num              . (34 i 11 -1))
+    (led-rear-type             . (35 i 2 -1))
     (led-rear-reversed         . (36 b 0 -1))
-    (led-rear-strip-type       . (37 b 2 -1))
+    (led-rear-strip-type       . (37 b 7 -1))
     (led-button-pin            . (38 b -1 -1))
     (led-button-strip-type     . (39 b 0 -1))
     (led-footpad-pin           . (40 i -1 -1))
@@ -271,7 +271,7 @@
             })
         })
 
-        (if (and (or (= in-led-front-strip-type 1) (= in-led-front-strip-type 6)) (>= in-led-front-highbeam-pin 0)) {
+        (if (and (= in-led-front-strip-type 7) (>= in-led-front-highbeam-pin 0)) {
             (if (not-eq (first (trap (gpio-configure in-led-front-highbeam-pin 'pin-mode-out))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-front-highbeam-pin")
             }{
@@ -279,7 +279,7 @@
             })
         })
 
-        (if (and (or (= in-led-rear-strip-type 1) (= in-led-rear-strip-type 6)) (>= in-led-rear-highbeam-pin 0)) {
+        (if (and (= in-led-rear-strip-type 7) (>= in-led-rear-highbeam-pin 0)) {
             (if (not-eq (first (trap (gpio-configure in-led-rear-highbeam-pin 'pin-mode-out))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-rear-highbeam-pin")
             }{

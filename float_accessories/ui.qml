@@ -18,6 +18,8 @@ Item {
     property Commands mCommands: VescIf.commands()
     property int floatAccessoriesMagic: 102
     property bool acceptTOS: false
+    property int lastStatusTime: 0
+    property bool statusTimeout: false
     Component.onCompleted: {
         if (!(VescIf.getLastFwRxParams().hw.includes("Express") || VescIf.getLastFwRxParams().hw.includes("Avaspark")) || VescIf.getLastFwRxParams().hw.includes("rESCue")) {
             VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express, Avaspark or rESCue board", false, false)
@@ -32,6 +34,10 @@ Timer {
     repeat: true
     onTriggered: {
         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(status)")
+            lastStatusTime++
+            if (lastStatusTime > 2) { // 2 second timeout
+                statusTimeout = true
+            }
     }
 }
     // Timer for 30-second timeout
@@ -457,7 +463,7 @@ ScrollView {
 
                 ColumnLayout {
                     id: ledHighBeamBrightnessLayout
-                    visible: ledOn.checked && false
+                    visible: ledOn.checked && ledHighbeamOn.checked && (ledFrontStripType.currentIndex === 7 || ledRearStripType.currentIndex === 7)
                     spacing: 10
                     Text {
                         color: Utility.getAppHexColor("lightText")
@@ -479,7 +485,7 @@ ScrollView {
         GroupBox {
             title: "BMS Control"
             Layout.fillWidth: true
-            visible: bmsEnabled.checked && bmsType.currentIndex >= 3
+            visible: bmsEnabled.checked && bmsType.currentIndex > 1
 
             ColumnLayout {
                 anchors.fill: parent
@@ -504,7 +510,12 @@ ScrollView {
                 anchors.fill: parent
                 spacing: 10
                 // Status Texts Column
-
+                    Text {
+                        id: lastStatusText
+                        Layout.fillWidth: true
+                        color: statusTimeout ? "red" : Utility.getAppHexColor("lightText")
+                        text: "Last Lisp Update: " + lastStatusTime + "s ago"
+                    }
                     Text {
                         id: floatPackageStatus
                         Layout.fillWidth: true
@@ -530,7 +541,7 @@ ScrollView {
         GroupBox {
             title: "BMS Info"
             Layout.fillWidth: true
-            visible: bmsEnabled.checked
+            visible: bmsEnabled.checked && bmsConnected === 1
             ColumnLayout {
                 anchors.fill: parent
                 spacing: 10
@@ -596,9 +607,23 @@ SpinBox {
     id: ledFix
     from: 1
     to: 1000000
-    value: 1
+    value: 100
     editable: true
 }
+
+Text {
+    color: Utility.getAppHexColor("lightText")
+    text: "LED Max Brightness (80% by default to prevent LED burnout)"
+}
+
+Slider {
+    id: ledMaxBrightness
+    from: 0.0
+    to: 1.0
+    value: 0.8
+    stepSize: 0.01
+    }
+
 Text {
     color: Utility.getAppHexColor("lightText")
     text: "Dim RGB on Highbeam (% of main brightness)"
@@ -746,18 +771,6 @@ Slider {
                                     id: ledShowBatteryCharging
                                     text: "Show battery % while charging"
                                     checked: false
-                                }
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Voltage Chatter Threshold"
-                                }
-
-                                SpinBox {
-                                    id: vinChatterThreshold
-                                    from: 1
-                                    to: 1000
-                                    value: 20
-                                    editable: true
                                 }
                                 ColumnLayout {
                                     id: ledBrakeLightLayout
@@ -965,7 +978,7 @@ SpinBox {
 
                                 ColumnLayout {
                                     id: ledFrontHighbeamPinLayout
-                                    visible: ledFrontStripType.currentValue === 7 || ledFrontStripType.currentValue === 1
+                                    visible: ledFrontStripType.currentValue === 7
                                     spacing: 10
 
                                     Text {
@@ -1092,7 +1105,7 @@ SpinBox {
                                 }
                                 ColumnLayout {
                                     id: ledRearHighbeamPinLayout
-                                    visible: ledRearStripType.currentValue === 7 || ledRearStripType.currentValue === 1
+                                    visible: ledRearStripType.currentValue === 7
                                     spacing: 10
 
                                     Text {
@@ -1380,10 +1393,8 @@ Text {
                                     Layout.fillWidth: true
                                     model: [
                                         {text: "None", value: 0},
-                                        {text: "XR", value: 1},
-                                        {text: "Pint", value: 2},
-                                        {text: "GT", value: 3},
-                                        {text: "GTS", value: 4}
+                                        {text: "Unencrypted", value: 1},
+                                        {text: "Encrypted", value: 2},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -1399,7 +1410,7 @@ Text {
                                     spacing: 10
                                 ColumnLayout {
                                     id: bmsCryptoSettingsLayout
-                                    visible: bmsType.currentIndex > 2
+                                    visible: bmsType.currentIndex > 1
                                     spacing: 10
                             Button {
                             text: "Set Keys"
@@ -1412,7 +1423,7 @@ Text {
                             }
                             CheckBox {
                                 id: bmsRS485Chip
-                                text: "RS485 Chip (Required to set charger level on GT/GTS. Else use OWIE RS485 uart hack)"
+                                text: "RS485 Chip (Required to set charger level on encrypted bms. Else use OWIE RS485 uart hack)"
                                 checked: false
                             }
                             Text {
@@ -1641,7 +1652,7 @@ TextArea {
 
           "<p><b>RELEASE NOTES</b></p>" +
           "<p>Now with BMS and Pubmote (beta)</p>" +
-          
+
           "<p><b>BUILD INFO</b></p>" +
           "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
     Layout.fillWidth: true
@@ -1865,10 +1876,10 @@ function makeArgStr() {
         bmsChargeOnly.checked * 1,
         ledFix.value,
         ledShowBatteryCharging.checked * 1,
-        vinChatterThreshold.value,
         ledFrontHighbeamPin.value,
         ledRearHighbeamPin.value,
-        bmsBuffSize.value
+        bmsBuffSize.value,
+        parseFloat(ledMaxBrightness.value).toFixed(2)
 
     ].join(" ");
 }
@@ -2000,10 +2011,10 @@ function makeArgStr() {
                 bmsChargeOnly.checked = Number(tokens[72])
                 ledFix.value = Number(tokens[73])
                 ledShowBatteryCharging.checked = Number(tokens[74])
-                vinChatterThreshold.value = Number(tokens[75])
-                ledFrontHighbeamPin.value = Number(tokens[76])
-                ledRearHighbeamPin.value = Number(tokens[77])
-                bmsBuffSize.value = Number(tokens[78])
+                ledFrontHighbeamPin.value = Number(tokens[75])
+                ledRearHighbeamPin.value = Number(tokens[76])
+                bmsBuffSize.value = Number(tokens[77])
+                ledMaxBrightness.value = Number(tokens[78])
 
                 pubmoteMacAddress.text = "Pubmote MAC: " + ((Number(tokens[46]) == -1) ? "Not Paired" : macAddress.toUpperCase());
             } else if (str.startsWith("msg")) {
@@ -2025,6 +2036,8 @@ function makeArgStr() {
                 bmsError.text = "BMS Error: " + bmsStatusTemp + "\nCharging: " + ((bmsStatusTemp & 0x20)>0) + "\nEmpty: " + ((bmsStatusTemp & 0x04)>0) + "\nTemp: " + ((bmsStatusTemp & 0x03)>0) + "\nOvercharge: " + ((bmsStatusTemp & 0x08)>0) + "\nSoC Calibration: " + ((bmsStatusTemp & 0x40)>0)
                 bmsBatteryType.text = "Battery Type: " + Number(tokens[5])
                 bmsBatteryCycles.text = "Battery Cycles: " + Number(tokens[6])
+                lastStatusTime = 0  // Reset the timer when status is received
+                statusTimeout = false
             } else if (str.startsWith("control")) {
                 var tokens = str.split(" ")
                 ledOn.checked = Number(tokens[1])

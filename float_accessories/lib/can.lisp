@@ -22,11 +22,7 @@
 (def bms-is-charging nil)
 (def bms-charger-just-plugged nil)
 (def bms-charger-plug-in-time 0)
-(def bms-check-voltage-timer 0)
 (def vin -1)
-(def vin-prev -1)
-(def vin-sample -1)
-(def vin-chatter 0)
 (def last-running-state-time 0)
 (def refloat-battery-percent nil)
 
@@ -75,25 +71,6 @@
             (if (not (and bms-charger-just-plugged (<= (- (secs-since 0) bms-charger-plug-in-time) 5))){
                 ; Reset the flag if more than 5 seconds have passed
                 (setq bms-charger-just-plugged nil)
-            })
-        }{;if we don't have a smart BMS, we can guage if it's charging by sampling voltage over time when the board is not running.
-            (if (running-state){
-                (setq bms-is-charging nil)
-            }{
-                (if (!= vin vin-prev){
-                    (setq vin-chatter (+ vin-chatter 1))
-                })
-                (if (>= (- (secs-since 0) bms-check-voltage-timer) 30){
-                    (if (and (>= (- vin vin-sample) 0.0) (>= vin-chatter (get-config 'vin-chatter-threshold)) (< battery-percent-remaining 99.0)){
-                        (setq bms-is-charging t)
-                    }{
-                        (setq bms-is-charging nil)
-                    })
-                    (setq vin-chatter 0)
-                    (setq bms-check-voltage-timer (secs-since 0))
-                    (setq vin-sample vin)
-                })
-                (setq vin-prev vin)
             })
         })
 
@@ -213,7 +190,6 @@
                                 )
                                 (setq pitch-angle (/ (to-float (bufget-i16 data 19)) 10))
                                 (setq vin (/ (to-float (bufget-i16 data 22)) 10))
-                                (if (= vin-prev -1){ (setq vin-prev vin) (setq vin-sample vin) })
                                 (setq rpm (/ (to-float  (bufget-i16 data 24)) 10))
                                 (setq speed (/ (to-float (bufget-i16 data 26)) 10))
                                 (setq tot-current (/ (to-float (bufget-i16 data 28)) 10))

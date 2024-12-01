@@ -49,6 +49,7 @@
 (def led-footpad-type)
 (def led-footpad-reversed)
 (def led-footpad-strip-type)
+(def led-max-brightness)
 
 (def led-max-blend-count 0.0)  ; how many times to blend before new led buffer
 (def led-startup-timeout)
@@ -80,6 +81,11 @@
 (def mall-grab-start t)
 (def mall-grab-button-timer 0)
 (def mall-grab-event t)
+(def front-pattern-index)
+(def rear-pattern-index)
+(def button-pattern-index)
+(def footpad-pattern-index)
+(def status-pattern-index)
 
 (defun load-led-settings () {
     (setq led-enabled (get-config 'led-enabled))
@@ -130,9 +136,15 @@
     (setq led-show-battery-charging (get-config 'led-show-battery-charging))
     (setq led-front-highbeam-pin (get-config 'led-front-highbeam-pin))
     (setq led-rear-highbeam-pin (get-config 'led-front-highbeam-pin))
+    (setq led-max-brightness (get-config 'led-max-brightness))
 })
 
 (defun init-led-vars () {
+    (setq front-pattern-index 0)
+    (setq rear-pattern-index 0)
+    (setq button-pattern-index 0)
+    (setq footpad-pattern-index 0)
+    (setq status-pattern-index 0)
     (def blend-count led-max-blend-count)
     (setq combined-pins nil)
     (setq led-current-brightness 0.0)
@@ -305,8 +317,8 @@
     (clear-leds)
     (led-flush-buffers)
     (rgbled-deinit)
-    (pwm-stop 0)
-    (pwm-stop 1)
+    (if (and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) (pwm-stop 0))
+    (if (and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) (pwm-stop 1))
     (setq led-exit-flag nil)
 })
 
@@ -332,6 +344,7 @@
 (defun led-flush-buffers () {
     (reverse-led-strips)
     ;Enable/disable high beams and lets dim the rest of the leds if the high beams are on to help temps if on seperate pins
+
     (var led-current-brightness-rear led-current-brightness)
     (var led-current-brightness-front led-current-brightness)
     (var led-dim-on-highbeam-brightness (* led-current-brightness led-dim-on-highbeam-ratio))
@@ -367,7 +380,7 @@
             (var led-tmp (take led-front-color (length led-front-color)))
             (setq led-current-front-color (mklist (+ (length led-front-color) 4) 0))
             (var led-tmp-index 0)
-            (setq led-current-brightness-front (+ 60.0 (* (if (= led-front-strip-type 4) 20 40) led-current-brightness-front))) ; Maps 0-1 to 60-100
+            (setq led-current-brightness-front (+ 0.6 (* (if (= led-front-strip-type 4) 0.2 0.4) led-current-brightness-front))); Maps 0-1 to 0.60-1.0
             (looprange k 0 (length led-current-front-color){
                 (if (or (and (or (= led-front-strip-type 4) (= led-front-strip-type 5)) (or (= k 2) (= k 7) (= k 13) (= k 18))) (and (= led-front-strip-type 6) (or (= k 1) (= k 4) (= k 10) (= k 13)))) {
                     (setix led-current-front-color k front-color-highbeam)
@@ -382,7 +395,7 @@
             })
         })
         ((and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) {
-            (if front-highbeam-on (pwm-set-duty led-brightness-highbeam 0) (pwm-set-duty 0.0 0))
+            (if front-highbeam-on (pwm-set-duty (min led-brightness-highbeam led-max-brightness) 0) (pwm-set-duty 0.0 0))
             (setq led-current-front-color led-front-color)
             (setq led-current-brightness-front led-current-brightness)
         })
@@ -403,7 +416,7 @@
             (var led-tmp (take led-rear-color (length led-rear-color)))
             (setq led-current-rear-color (mklist (+ (length led-rear-color) 4) 0))
             (var led-tmp-index 0)
-            (setq led-current-brightness-rear (+ 60.0 (* (if (= led-rear-strip-type 4) 20 40) led-current-brightness-rear))) ; Maps 0-1 to 60-100
+            (setq led-current-brightness-rear (+ 0.6 (* (if (= led-rear-strip-type 4) 0.2 0.4) led-current-brightness-rear))) ; Maps 0-1 to 0.60-1.0
             (looprange k 0 (length led-current-rear-color){
                 (if (or (and (or (= led-rear-strip-type 4) (= led-rear-strip-type 5)) (or (= k 2) (= k 7) (= k 13) (= k 18))) (and (= led-rear-strip-type 6) (or (= k 1) (= k 4) (= k 10) (= k 13) ))) {
                     (setix led-current-rear-color k rear-color-highbeam)
@@ -418,7 +431,7 @@
             })
         })
         ((and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) {
-            (if rear-highbeam-on (pwm-set-duty led-brightness-highbeam 1) (pwm-set-duty 0.0 1))
+            (if rear-highbeam-on (pwm-set-duty (min led-brightness-highbeam led-max-brightness) 1) (pwm-set-duty 0.0 1))
             (setq led-current-rear-color led-rear-color)
             (setq led-current-brightness-rear led-current-brightness)
         })
@@ -472,7 +485,7 @@
             }{
                 ; LED strips are on separate pins
                 (if (and (> led-status-strip-type 0) (>= led-status-pin 0)) {
-                    (rgbled-color led-status-buffer 0 led-status-color led-brightness-status)
+                    (rgbled-color led-status-buffer 0 led-status-color (min led-brightness-status led-max-brightness))
                     (rgbled-init led-status-pin led-status-type)
                     (yield led-fix)
                     (rgbled-update led-status-buffer)
@@ -517,7 +530,7 @@
 (defun update-button-led () {
     (cond
         ((= led-mode-button 0) {
-            (rainbow-button)
+            (setq button-pattern-index (rainbow-pattern led-button-color button-pattern-index))
         })
     )
 })
@@ -528,10 +541,10 @@
         (if (= led-mode-status 0) (update-status-leds can-last-activity-time-sec))
     })
     (var current-led-mode led-mode)
-    (setq led-current-brightness led-brightness)
+    (setq led-current-brightness (min led-brightness led-brightness led-max-brightness))
     (if (or (and (>= last-activity-sec idle-timeout) (<= can-last-activity-time-sec 1)) (= state 5)) {
         (setq current-led-mode led-mode-idle)
-        (setq led-current-brightness led-brightness-idle)
+        (setq led-current-brightness (min led-brightness-idle led-max-brightness))
     })
 
     (if (and (<= (secs-since 0) led-startup-timeout) (not (running-state) )) { (setq current-led-mode led-mode-startup)})
@@ -558,7 +571,7 @@
             (if (> (length led-footpad-color) 0){
                 (cond
                     ((= led-mode-footpad 0) {
-                        (rainbow-footpad)
+                        (setq footpad-pattern-index (rainbow-pattern led-foodpad-color foodpad-pattern-index))
                     })
                 )
             })
@@ -593,10 +606,12 @@
                         (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x0000FF00u32)
                     })
                     ((= current-led-mode 5) {
-                        (rainbow-pattern)
+                        (setq front-pattern-index (rainbow-pattern led-front-color front-pattern-index))
+                        (setq rear-pattern-index (rainbow-pattern led-rear-color rear-pattern-index))
                     })
                     ((= current-led-mode 6) {
-                        (strobe-pattern)
+                        (setq front-pattern-index (strobe-pattern led-front-color front-pattern-index))
+                        (setq rear-pattern-index (strobe-pattern led-rear-color rear-pattern-index))
                     })
                     ((= current-led-mode 7) {
                         (rave-pattern 0)
@@ -608,7 +623,8 @@
                         (knight-rider-pattern)
                     })
                     ((= current-led-mode 10) {
-                        (felony-pattern)
+                        (setq front-pattern-index (felony-pattern led-front-color front-pattern-index))
+                        (setq rear-pattern-index (felony-pattern led-rear-color rear-pattern-index))
                     })
                 )
                 (if (and (= led-brake-light-enabled 1) (running-state) (!= state 5) (<= tot-current led-brake-light-min-amps)){
@@ -652,5 +668,7 @@
     (set-led-strip-color led-front-color 0x00)
     (set-led-strip-color led-rear-color 0x00)
     (set-led-strip-color led-footpad-color 0x00)
+    (if (and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) (pwm-set-duty 0.0 0))
+    (if (and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) (pwm-set-duty 0.0 1))
 })
 @const-end

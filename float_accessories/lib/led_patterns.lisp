@@ -1,40 +1,35 @@
 ;@const-symbol-strings
+(def rainbow-colors '(0x00FF0000 0x00FFFF00 0x0000FF00 0x0000FFFF 0x000000FF 0x00FF00FF))
 @const-start
-(def rainbow-colors '(0xFF0000u32 0xFFFF00u32 0x00FF00u32 0x00FFFFu32 0x0000FFu32 0xFF00FFu32))
-(def rave-colors '(0x00FFFF00 0x0000FF00 0x0000FFFF 0x000000FF 0x00FF00FF 0x00FF0000))
 (def strobe-index 0)
 (def brake-index 0)
 (def rave-index 0)
 (def knight-rider-position 0)
 (def knight-rider-direction 1)
-(def rainbow-index 0)
-(def rainbow-button-index 0)
-(def rainbow-footpad-index 0)
 (def felony-index 0)
 
-(defun led-float-disabled (led-color) {
-    (var led-num (length led-color))
+(defun led-float-disabled (color-list) {
+    (var led-num (length color-list))
     (var start (floor (/ led-num 4.0)))
     (var end (floor (* led-num 3 (/ 1 4.0))))
     ; Single loop for LEDs
     (looprange i 0 led-num {
         (if (and (>= i start) (< i end)) {
             (if (or (= i start) (= i (- end 1))) {
-                (setix led-color i 0x007F0000)  ; Dimmed red for first and last
+                (setix color-list i 0x007F0000)  ; Dimmed red for first and last
             }{
-                (setix led-color i 0x00FF0000)  ; Full red for center
+                (setix color-list i 0x00FF0000)  ; Full red for center
             })
         }{
-            (setix led-color i 0x00000000)  ; Black for outer LEDs
+            (setix color-list i 0x00000000)  ; Black for outer LEDs
         })
     })
 })
 
-(defun strobe-pattern () {
-    (setq strobe-index (mod (+ strobe-index 1) 2))
+(defun strobe-pattern (color-list strobe-index) {
     (var color (if (= strobe-index 0) 0xFFFFFFFF 0x00000000))
-    (set-led-strip-color led-front-color color)
-    (set-led-strip-color led-rear-color color)
+    (set-led-strip-color color-list color)
+    (mod (+ strobe-index 1) 2)
 })
 (defun brake-pattern (color-list) {
     (setq brake-index (mod (+ brake-index 1) 2))
@@ -42,10 +37,10 @@
 })
 
 (defun rave-pattern (type){
-    (var current-color (ix rave-colors rave-index))
+    (var current-color (ix rainbow-colors rave-index))
     (set-led-strip-color led-front-color (if (= type 0) current-color 0xFFFFFFFF))
     (set-led-strip-color led-rear-color current-color)
-    (setq rave-index (mod (+ rave-index 1) 6))
+    (setq rave-index (mod (+ rave-index 1) (length rainbow-colors)))
 })
 
 (defun knight-rider-pattern (){
@@ -94,81 +89,44 @@
     })
 })
 
-(defun rainbow-pattern () {
+(defun rainbow-pattern (color-list rainbow-index) {
     (var num-colors (length rainbow-colors))
-    (looprange led-index 0 (length led-front-color) {
-        (var color-index (mod (+ rainbow-index led-index (length led-front-color)) num-colors))
+    (looprange led-index 0 (length color-list) {
+        (var color-index (mod (+ rainbow-index led-index (length color-list)) num-colors))
         (var color (ix rainbow-colors color-index))
-        (setix led-front-color led-index color)
+        (setix color-list led-index color)
     })
-    (looprange led-index 0 (length led-rear-color) {
-        (var color-index (mod (+ rainbow-index led-index (length led-rear-color)) num-colors))
-        (var color (ix rainbow-colors color-index))
-        (setix led-rear-color led-index color)
-    })
-    (setq rainbow-index (mod (+ rainbow-index 1) num-colors))
+    (mod (+ rainbow-index 1) num-colors)
 })
 
-(defun rainbow-button (){
-    (var num-colors (length rainbow-colors))
-    (var color-index (mod (+ rainbow-button-index 1) num-colors))
-    (var color (ix rainbow-colors color-index))
-    (setix led-button-color 0 (ix rainbow-colors color-index))
-    (setq rainbow-button-index (mod (+ rainbow-button-index 1) num-colors))
-})
-
-(defun rainbow-footpad (){
-    (var num-colors (length rainbow-colors))
-    (looprange led-index 0 (length led-footpad-color) {
-        (var color-index (mod (+ rainbow-index led-index (length led-footpad-color)) num-colors))
-        (var color (ix rainbow-colors color-index))
-        (setix led-footpad-color led-index color)
-    })
-    (setq rainbow-footpad-index (mod (+ rainbow-index 1) num-colors))
-})
-
-(defun felony-pattern () {
+(defun felony-pattern (color-list felony-index) {
     (var felony-state (mod felony-index 3))
-    (var led-front-num (length led-front-color))
-    (var led-rear-num (length led-rear-color))
-    (var forward-half (floor (/ led-front-num 2)))
-    (var rear-half (floor (/ led-rear-num 2)))
+    (var led-num (length color-list))
+    (var led-half (floor (/ led-num 2)))
 
     (cond
       ((= felony-state 0) {
-       (looprange i 0 forward-half
-         (setix led-front-color i 0x00000000)) ; BLACK
-       (looprange i forward-half led-front-num
-         (setix led-front-color i 0x00FF0000)) ; RED
-       (looprange i 0 rear-half
-         (setix led-rear-color i 0x00000000)) ; BLACK
-       (looprange i rear-half led-rear-num
-         (setix led-rear-color i 0x00FF0000)) ; RED
+       (looprange i 0 led-half
+         (setix color-list i 0x00000000)) ; BLACK
+       (looprange i led-half led-num
+         (setix color-list i 0x00FF0000)) ; RED
       })
 
       ((= felony-state 1) {
-       (looprange i 0 forward-half
-         (setix led-front-color i 0x00FF0000)) ; RED
-       (looprange i forward-half led-front-num
-         (setix led-front-color i 0x000000FF)) ; BLUE
-       (looprange i 0 rear-half
-         (setix led-rear-color i 0x00FF0000)) ; RED
-       (looprange i rear-half led-rear-num
-         (setix led-rear-color i 0x000000FF)) ; BLUE
+       (looprange i 0 led-half
+         (setix color-list i 0x00FF0000)) ; RED
+       (looprange i led-half led-num
+         (setix color-list i 0x000000FF)) ; BLUE
       })
 
       ((= felony-state 2) {
-       (looprange i 0 forward-half
-         (setix led-front-color i 0x000000FF)) ; BLUE
-       (looprange i forward-half led-front-num
-         (setix led-front-color i 0x00000000)) ; BLACK
-       (looprange i 0 rear-half
-         (setix led-rear-color i 0x000000FF)) ; BLUE
-       (looprange i rear-half led-rear-num
-         (setix led-rear-color i 0x00000000)) ; BLACK
+       (looprange i 0 led-half
+         (setix color-list i 0x000000FF)) ; BLUE
+       (looprange i led-half led-num
+         (setix color-list i 0x00000000)) ; BLACK
       }))
 
-    (setq felony-index (mod (+ felony-index 1) 3))
+    (mod (+ felony-index 1) 3)
 })
 
 (defun duty-cycle-pattern (color-list) {

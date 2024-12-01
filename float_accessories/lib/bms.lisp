@@ -1,7 +1,11 @@
 ;@const-symbol-strings
 
-(def key (bufcreate 16)) ;AES-128 key. Offset in 6109: 0x12009
-(def counter (bufcreate 16)) ;IV for counter. Offset in 6109: 0x12019
+;const
+(def key-crc '(3141361152u32))  ;AES-128 key. Offset in 6109: 0x12009
+(def counter-crc '(4092889840u32)) ;IV for counter. Offset in 6109: 0x12019
+
+(def key (bufcreate 16))
+(def counter (bufcreate 16))
 (def lut [0 0 0 0 1 2 3 4 5 7 8 11 14 16 18 19 25 30 33 37 43 48 53 60 67 71 76 82 92 97 100]);Update for battery curve
 (def magic [0xff 0x55 0x00])
 
@@ -19,6 +23,7 @@
 (def bms-charge-only 0)
 
 ;vars
+(def cell-count-uninit t)
 (def factory -1);TODO Check if bms is in factory mode somehow and init if is. Probably have a timer at boot looking for packets to determine valid state when connected.
 (def bms-status -1)
 (def bms-battery-type -1)
@@ -30,9 +35,7 @@
 (def is-battery-temp-out-of-range -1)
 (def is-battery-overcharged -1)
 (def serial -1)
-;const
-(def key-crc 3141361152u32)
-(def counter-crc 4092889840u32)
+
 
 (defun crypt (nonce-high nonce-low data start-offset len) {
     (var restore-byte (bufget-u8 counter 15))
@@ -140,7 +143,12 @@
 (defun parse-cell-voltage (data){
     (var cell-index 0)
     (var total-voltage 0)
-    (looprange k (if bms-use-crypto 6 4) (- (buflen data) (+ (if bms-use-crypto 0 2) 3)) { ;Need to leave off end 16th cell on xr/pint
+    (if cell-count-uninit {
+        (set-bms-val 'bms-cell-num (/ (- (buflen data) 8) 2))
+        (setq cell-count-uninit false)
+    })
+
+    (looprange k (if bms-use-crypto 6 4) (- (buflen data) (+ (if bms-use-crypto 0 2) 3)) { ;Need to leave off end 16th cell for 15s BMS
         (if (eq (mod k 2) 0) {
             ;calculate voltage based soc based on first cell mv
             (if (and (= cell-index 0) (= bms-override-soc 1)) {
@@ -166,9 +174,9 @@
 })
 
 (defun parse-current (data) {
-    (var current-scaler (if bms-use-crypto 0.0366 0.055)); Current scaler. 0.0366 or 0.0378 not sure... ;This was what looked to be the scaler in Ghidra for GT
+    (var current-scaler (if bms-use-crypto 0.0366 0.055)); Current scaler. 0.0366 or 0.0378 not sure...
     ;maybe look at tot-current from controller and then calculate scaler and take average to see which is closer?
-    (var current-limit (if bms-use-crypto 32.0 30.0)) ;Limit 30A for XR/Pint and 32A for GT. I think the GT controller does 0x7fff (32.7) before throwing 0xe error
+    (var current-limit (if bms-use-crypto 32.0 30.0)) ;Limit 32A or 32.7A, not sure.
     (var current (* (bufget-i16 data (if bms-use-crypto 6 4)) current-scaler))
 
     (if (and (not bms-charge-only) (>= current current-limit)) {
@@ -216,21 +224,7 @@
     (setq bms-battery-health (bufget-u8 data (if bms-use-crypto 8 6)))
 })
 
-;(def mylist '())
-;(def aTimer 0)
 (defunret process-cmd (command data ack handshake) {
-;(if (= (buflen data) 9){; (and (= (buflen data) 9) (or (= (bufget-u8 data 6) 1) (= (bufget-u8 data 6) 0))) {
-;                (print (bufget-u8 data 5))
-;                (print (bufget-u8 data 6))
-;                    })
-;(var found false)
-;(looprange i 0 (length myList){
-;    (if (= (ix myList i) command) {(setq found true)})
-;})
-;(if (not found) (setq myList (append (list command) myList)))
-
-;(if (> (secs-since aTimer) 1) {(print myList) (setq aTimer (systime))})
-
     (cond
         ((= command 0x00) {
             (parse-status data)
@@ -253,20 +247,20 @@
         ((= command 0x06) {
             (parse-serial data)
         })
-        ;((= command 0x07) { ; acknowleged as valid packet by GT controller but no processing ;Emitted by GT BMS
+        ;((= command 0x07) { ; acknowleged as valid packet by controller but no processing ;Emitted by BMS
             ;static maybe these next bytes have to do with firmware build or hardware?
         ;})
         ((= command 0x08) {
             (parse-battery-type data)
         })
-        ;((= command 0x09) { ;looked at by GT controller
+        ;((= command 0x09) { ;looked at by controller
         ;})
-        ;((= command 0x0A) { ; acknowleged as valid packet by GT controller but no processing. Sent during bms startup?
+        ;((= command 0x0A) { ; acknowleged as valid packet by controller but no processing. Sent during bms startup?
         ;})
-        ;((= command 0x0B) { ;Emitted by GT BMS
+        ;((= command 0x0B) { ;Emitted by BMS
             ;static
         ;})
-        ;((= command 0x0C) { ; acknowleged as valid packet by GT controller but no processing ;Emitted by GT BMS. Seems to be all 0 unless on charger.
+        ;((= command 0x0C) { ; acknowleged as valid packet by controller but no processing ;Emitted by BMS. Seems to be all 0 unless on charger.
         ;})
         ((= command 0x0D) {
             (parse-cycles-health data)
@@ -286,29 +280,29 @@
 
             })
         })
-        ;((= command 0x0F) { ; Looked at by GT controller ;Emitted by GT BMS
+        ;((= command 0x0F) { ; Looked at by controller ;Emitted by BMS
         ;    ;error?
         ;})
-        ;((= command 0x10) { ; looked at by GT controller ;Emitted by GT BMS
+        ;((= command 0x10) { ; looked at by controller ;Emitted by BMS
         ;    ;unknown maybe error code logs?
         ;})
-        ;((= command 0x11) { ; looked at by GT controller
+        ;((= command 0x11) { ; looked at by controller
         ;})
-        ;((= command 0x12) { ; acknowleged as valid packet by GT controller but no processing ;Emitted by GT BMS
+        ;((= command 0x12) { ; acknowleged as valid packet by controller but no processing ;Emitted by BMS
         ;})
-        ;((= command 0x13) { ;Emitted by GT BMS
+        ;((= command 0x13) { ;Emitted by BMS
         ;})
-        ;((= command 0x14) { ;Emitted by GT BMS
+        ;((= command 0x14) { ;Emitted by BMS
         ;})
         ((= command 0x15) {
             (if (and ack (= (bufget-u8 data (if bms-use-crypto 6 4)) bms-charge-state)) {(parse-charger data) (return false)})
             (parse-charger data)
         })
-        ;((= command 0x16) { ; looked at by GT controller ;Emitted by GT BMS
+        ;((= command 0x16) { ; looked at by controller ;Emitted by BMS
             ;unknown last byte changes
         ;})
-        ;So in GT bms recv we know there's no valid commands above 0x16 (command 0x64 is special and gets sent from controller to BMS)
-        ;((= command 0x64) { ;Sent by GT controller. Should be recieved by GT BMS and update 0x15
+        ;So in bms recv we know there's no valid commands above 0x16 (command 0x64 is special and gets sent from controller to BMS)
+        ;((= command 0x64) { ;Sent by controller. Should be recieved by BMS and update 0x15
             ;bms-charge-state cmd
             ;(print "charge state cmd")
         ;})
@@ -334,7 +328,9 @@
 (defunret verify-keys (key counter key-crc counter-crc) {
     (var key-crc-calc (crc32 key 0))
     (var counter-crc-calc (crc32 counter 0))
-    (if (and (= key-crc key-crc-calc) (= counter-crc counter-crc-calc)) (return true))
+    (looprange i 0 (length key-crc) {
+        (if (and (= (ix key-crc i) key-crc-calc) (= (ix counter-crc i) counter-crc-calc)) (return true))
+    })
     (print key)
     (return false)
 })
@@ -453,18 +449,6 @@
     })
 
     (uart-start 1 bms-rs485-ro-pin (if (= bms-rs485-chip 1) bms-rs485-di-pin -1) 115200);If GNSS is connected UART 1 must be used
-
-    (cond
-        ((<= bms-type 2) {
-            (set-bms-val 'bms-cell-num 15)
-        })
-        ((= bms-type 3) {
-            (set-bms-val 'bms-cell-num 18)
-        })
-        ((= bms-type 4) {
-            (set-bms-val 'bms-cell-num 27)
-        })
-    )
     (set-bms-val 'bms-temp-adc-num 4)
     (set-bms-val 'bms-temp-cell-max 45)
     (bufset-u8 magic 2 (if bms-use-crypto 0xbb 0xaa))
@@ -481,7 +465,7 @@
     (setq bms-override-soc (get-config 'bms-override-soc))
     (setq bms-type (get-config 'bms-type))
     (setq bms-use-crypto nil)
-    (if (> bms-type 2) (setq bms-use-crypto t))
+    (if (> bms-type 1) (setq bms-use-crypto t))
     (setq bms-rs485-chip (get-config 'bms-rs485-chip))
     (setq bms-loop-delay (get-config 'bms-loop-delay))
     (setq bms-charge-only (get-config 'bms-charge-only))
@@ -498,6 +482,7 @@
         (var bms-loop-delay-sec (/ 1.0 bms-loop-delay))
         (loopwhile t{
         (setq loop-start-time (secs-since 0))
+
             (if bms-exit-flag {
                 (break)
             })

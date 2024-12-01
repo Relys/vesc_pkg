@@ -1,13 +1,13 @@
 ;@const-symbol-strings
 
 ; Settings version
-(def config-version 438i32)
+(def config-version 445i32)
 ; Persistent settings
 
 ; Format: (label . (offset type default-value current-value))
 (def eeprom-addrs '(
     (ver-code                  . (0 i config-version -1))
-    (crc                       . (1 i 27217 -1))
+    (crc                       . (1 i 20492 -1))
     (can-id                    . (2  i -1 -1))  ; if can-id < 0 then it will scan for one and pick the first.
     (accept-tos                . (3 b 0 -1))
     (led-enabled               . (4 b 1 -1))
@@ -26,14 +26,14 @@
     (led-brake-light-min-amps  . (17 f -4.0 -1))
     (idle-timeout              . (18 i 1 -1))
     (idle-timeout-shutoff      . (19 i 600 -1))
-    (led-brightness            . (20 f 0.6 -1))
-    (led-brightness-highbeam   . (21 f 0.5 -1))
-    (led-brightness-idle       . (22 f 0.3 -1))
+    (led-brightness            . (20 f 0.8 -1))
+    (led-brightness-highbeam   . (21 f 0.8 -1))
+    (led-brightness-idle       . (22 f 0.5 -1))
     (led-brightness-status     . (23 f 0.6 -1))
     (led-status-pin            . (24 i 9 -1))
     (led-status-num            . (25 i 10 -1))
     (led-status-type           . (26 i 0 -1))
-    (led-status-reversed       . (27 b 0 -1))
+    (led-status-reversed       . (27 b 1 -1))
     (led-front-pin             . (28 i 15 -1))
     (led-front-num             . (29 i 11 -1))
     (led-front-type            . (30 i 2 -1))
@@ -54,9 +54,9 @@
     (esp-now-remote-mac-a      . (45 i -1 -1))
     (esp-now-remote-mac-b      . (46 i -1 -1))
     (esp-now-secret-code       . (47 i -1 -1))
-    (bms-rs485-di-pin          . (48 i -1 -1))
-    (bms-rs485-ro-pin          . (49 i -1 -1))
-    (bms-rs485-dere-pin        . (50 i -1 -1))
+    (bms-rs485-di-pin          . (48 i 16 -1))
+    (bms-rs485-ro-pin          . (49 i 8 -1))
+    (bms-rs485-dere-pin        . (50 i 17 -1))
     (bms-wakeup-pin            . (51 i -1 -1))
     (bms-override-soc          . (52 i 0 -1))
     (bms-rs485-chip            . (53 b 0 -1))
@@ -69,7 +69,7 @@
     (bms-counter-c             . (60 i -1 -1))
     (bms-counter-d             . (61 i -1 -1))
     (led-loop-delay            . (62 i 20 -1))
-    (bms-loop-delay            . (63 i 6 -1))
+    (bms-loop-delay            . (63 i 8 -1))
     (pubmote-loop-delay        . (64 i 8 -1))
     (can-loop-delay            . (65 i 8 -1))
     (led-max-blend-count       . (66 i 4 -1))
@@ -78,12 +78,12 @@
     (bms-type                  . (69 i 0 -1))
     (led-status-strip-type     . (70 i 1 -1))
     (bms-charge-only           . (71 b 0 -1))
-    (led-fix                   . (72 i 1 -1))
+    (led-fix                   . (72 i 100 -1))
     (led-show-battery-charging . (73 b 0 -1))
-    (vin-chatter-threshold     . (74 i 20 -1))
-    (led-front-highbeam-pin    . (75 i -1 -1))
-    (led-rear-highbeam-pin     . (76 i -1 -1))
-    (bms-buff-size             . (77 i 128 -1))
+    (led-front-highbeam-pin    . (74 i -1 -1))
+    (led-rear-highbeam-pin     . (75 i -1 -1))
+    (bms-buff-size             . (76 i 128 -1))
+    (led-max-brightness        . (77 f 0.8 -1))
 ))
 
 @const-start
@@ -137,7 +137,7 @@
                     in-led-status-type in-led-status-reversed in-led-front-pin in-led-front-num in-led-front-type in-led-front-reversed in-led-front-strip-type
                     in-led-rear-pin in-led-rear-num in-led-rear-type in-led-rear-reversed in-led-rear-strip-type in-led-button-pin in-led-button-strip-type in-led-footpad-pin in-led-footpad-num in-led-footpad-type in-led-footpad-reversed
                     in-led-footpad-strip-type in-bms-rs485-di-pin in-bms-rs485-ro-pin in-bms-rs485-dere-pin in-bms-wakeup-pin in-bms-override-soc in-bms-rs485-chip in-led-loop-delay in-bms-loop-delay in-pubmote-loop-delay in-can-loop-delay
-                    in-led-max-blend-count in-led-startup-timeout in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging in-vin-chatter-threshold in-led-front-highbeam-pin in-led-rear-highbeam-pin in-bms-buff-size) {
+                    in-led-max-blend-count in-led-startup-timeout in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging in-led-front-highbeam-pin in-led-rear-highbeam-pin in-bms-buff-size in-led-max-brightness) {
     (if (>= led-context-id 0){
     (let ((start-time (systime))
         (timeout-val 100000))
@@ -230,8 +230,8 @@
         (set-config 'bms-charge-only (to-i in-bms-charge-only))
         (set-config 'led-fix (to-i in-led-fix))
         (set-config 'led-show-battery-charging (to-i in-led-show-battery-charging))
-        (set-config 'vin-chatter-threshold (to-i in-vin-chatter-threshold))
         (set-config 'bms-buff-size (to-i in-bms-buff-size))
+        (set-config 'led-max-brightness (to-float in-led-max-brightness))
 
    })
    (if (= in-led-enabled 1){
@@ -272,7 +272,7 @@
         })
 
         (if (and (= in-led-front-strip-type 7) (>= in-led-front-highbeam-pin 0)) {
-            (if (not-eq (first (trap (gpio-configure in-led-front-highbeam-pin 'pin-mode-out))) 'exit-ok) {
+            (if (not-eq (first (trap (pwm-start 2000 0.0 0 in-led-front-highbeam-pin 12))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-front-highbeam-pin")
             }{
                 (set-config 'led-front-highbeam-pin (to-i in-led-front-highbeam-pin))
@@ -280,7 +280,7 @@
         })
 
         (if (and (= in-led-rear-strip-type 7) (>= in-led-rear-highbeam-pin 0)) {
-            (if (not-eq (first (trap (gpio-configure in-led-rear-highbeam-pin 'pin-mode-out))) 'exit-ok) {
+            (if (not-eq (first (trap (pwm-start 2000 0.0 1 in-led-rear-highbeam-pin 12))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-rear-highbeam-pin")
             }{
                 (set-config 'led-rear-highbeam-pin (to-i in-led-rear-highbeam-pin))

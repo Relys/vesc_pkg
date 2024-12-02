@@ -114,7 +114,7 @@
     (set-config 'led-brightness-idle (to-float in-led-brightness-idle))
     (set-config 'led-brightness-status (to-float in-led-brightness-status))
     (if (and (= (get-config 'bms-enabled) 1) (> bms-type 1) (!= bms-charge-state in-bms-charge-state) ){
-        (setq bms-charge-state (if (= in-bms-charge-state 1) 1 0))
+        (setq bms-charge-state (if (= bms-charge-state 1) 1 0))
         (setq bms-user-cmd 0x64)
    })
 })

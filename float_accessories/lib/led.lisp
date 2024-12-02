@@ -315,6 +315,8 @@
         (setq next-run-time (+ next-run-time led-loop-delay-sec))
     })
     (clear-leds)
+    (set-led-strip-color led-button-color 0x00)
+    (set-led-strip-color led-status-color 0x00)
     (led-flush-buffers)
     (rgbled-deinit)
     (if (and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) (pwm-stop 0))

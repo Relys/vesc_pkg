@@ -59,7 +59,7 @@
         (float-cmd can-id (list (assoc float-cmds 'COMMAND_LCM_GET_BATTERY)))
         (float-cmd can-id (list (assoc float-cmds 'COMMAND_GET_ALLDATA) 3))
 
-        (if (>= bms-can-id 0){
+        (if (or (>= bms-can-id 0) (< (secs-since bms-last-activity-time) 1)){
             (var prev-charging-state bms-is-charging)
             (setq bms-is-charging (and (> (get-bms-val 'bms-v-charge) 10.0) (< (get-bms-val 'bms-i-in-ic) 0.1)))
 

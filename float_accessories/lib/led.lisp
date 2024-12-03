@@ -514,7 +514,11 @@
         (led-float-disabled led-status-color)
     }{
         (if (> rpm 250.0){
-            (duty-cycle-pattern led-status-color)
+            (if (> sat-t 2) {
+                (setq status-pattern-index (strobe-pattern led-status-color status-pattern-index 0x00FF0000))
+            }{
+                (duty-cycle-pattern led-status-color)
+            })
         }{
             (if (and (!= switch-state 1) (!= switch-state 2) (!= switch-state 3)){
                 ;(if (display-battery-charging) { TODO
@@ -522,8 +526,8 @@
                 ;}{
                     (battery-pattern led-status-color)
                 ;})
-            }{;else
-                (footpad-pattern switch-state)
+            }{
+                (footpad-pattern led-status-color switch-state)
             })
         })
     })
@@ -608,32 +612,38 @@
                         (set-led-strip-color (if (< direction 0) led-front-color led-rear-color) 0x0000FF00u32)
                     })
                     ((= current-led-mode 5) {
+                        (setq rear-pattern-index front-pattern-index)
                         (setq front-pattern-index (rainbow-pattern led-front-color front-pattern-index))
                         (setq rear-pattern-index (rainbow-pattern led-rear-color rear-pattern-index))
                     })
                     ((= current-led-mode 6) {
-                        (setq front-pattern-index (strobe-pattern led-front-color front-pattern-index))
-                        (setq rear-pattern-index (strobe-pattern led-rear-color rear-pattern-index))
+                        (setq rear-pattern-index front-pattern-index)
+                        (setq front-pattern-index (strobe-pattern led-front-color front-pattern-index 0xFFFFFFFF))
+                        (setq rear-pattern-index (strobe-pattern led-rear-color rear-pattern-index 0xFFFFFFFF))
                     })
                     ((= current-led-mode 7) {
-                        (rave-pattern 0)
+                        (setq rear-pattern-index front-pattern-index)
+                        (setq front-pattern-index (rave-pattern led-front-color front-pattern-index))
+                        (setq rear-pattern-index (rave-pattern led-rear-color rear-pattern-index))
                     })
                     ((= current-led-mode 8) {
-                        (rave-pattern 1)
+                        (set-led-strip-color led-front-color 0xFFFFFFFF)
+                        (setq rear-pattern-index (rave-pattern led-rear-color rear-pattern-index))
                     })
                     ((= current-led-mode 9) {
                         (knight-rider-pattern)
                     })
                     ((= current-led-mode 10) {
+                        (setq rear-pattern-index front-pattern-index)
                         (setq front-pattern-index (felony-pattern led-front-color front-pattern-index))
                         (setq rear-pattern-index (felony-pattern led-rear-color rear-pattern-index))
                     })
                 )
                 (if (and (= led-brake-light-enabled 1) (running-state) (!= state 5) (<= tot-current led-brake-light-min-amps)){
                     (if (>= direction 0){
-                        (brake-pattern led-rear-color)
+                        (setq rear-pattern-index (strobe-pattern led-rear-color rear-pattern-index 0x00FF0000))
                     }{
-                        (brake-pattern led-front-color)
+                        (setq front-pattern-index (strobe-pattern led-front-color front-pattern-index 0x00FF0000))
                     })
                 })
 

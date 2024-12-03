@@ -5,6 +5,7 @@
 (def pitch-angle 0)
 (def roll-angle 0)
 (def state 0)
+(def sat-t 0)
 (def switch-state 0)
 (def handtest-mode nil)
 (def rpm 0)
@@ -165,10 +166,10 @@
                         }{
                             (setq fault-code 0)
                             (if (>= (buflen data) 32) {
-                                (def roll-angle (/ (to-float (bufget-i16 data 7)) 10))
+                                (setq roll-angle (/ (to-float (bufget-i16 data 7)) 10))
                                 (var state-byte (bufget-u8 data 9))
                                 (setq state (bitwise-and state-byte 0x0F))
-                                ;(var sat-t (shr state-byte 4))
+                                (setq sat-t (shr state-byte 4))
                                 (var switch-state-byte (bufget-u8 data 10))
                                 (setq switch-state (bitwise-and switch-state-byte 0x0F))
                                 ;(var beep-reason-t (shr switch-state-byte 4))

@@ -1,12 +1,9 @@
 ;@const-symbol-strings
-(def rainbow-colors '(0x00FF0000 0x00FFFF00 0x0000FF00 0x0000FFFF 0x000000FF 0x00FF00FF))
+
 @const-start
-(def strobe-index 0)
-(def brake-index 0)
-(def rave-index 0)
+(def rainbow-colors '(0x00FF0000 0x00FFFF00 0x0000FF00 0x0000FFFF 0x000000FF 0x00FF00FF))
 (def knight-rider-position 0)
 (def knight-rider-direction 1)
-(def felony-index 0)
 
 (defun led-float-disabled (color-list) {
     (var led-num (length color-list))
@@ -26,20 +23,14 @@
     })
 })
 
-(defun strobe-pattern (color-list strobe-index) {
-    (var color (if (= strobe-index 0) 0xFFFFFFFF 0x00000000))
+(defun strobe-pattern (color-list strobe-index color) {
+    (var color (if (= strobe-index 0) color 0x00000000))
     (set-led-strip-color color-list color)
     (mod (+ strobe-index 1) 2)
 })
-(defun brake-pattern (color-list) {
-    (setq brake-index (mod (+ brake-index 1) 2))
-    (set-led-strip-color color-list (if (= brake-index 0) 0x00FF0000 0x00000000))
-})
 
-(defun rave-pattern (type){
-    (var current-color (ix rainbow-colors rave-index))
-    (set-led-strip-color led-front-color (if (= type 0) current-color 0xFFFFFFFF))
-    (set-led-strip-color led-rear-color current-color)
+(defun rave-pattern (color-list rave-index){
+    (set-led-strip-color color-list (ix rainbow-colors rave-index))
     (setq rave-index (mod (+ rave-index 1) (length rainbow-colors)))
 })
 
@@ -156,17 +147,17 @@
     })
 })
 
-(defun footpad-pattern (switch-state){
+(defun footpad-pattern (color-list switch-state){
     (var color-status-half1 (if (or (= switch-state 1) (= switch-state 3)) 0xFF 0x00))
     (var color-status-half2 (if (or (= switch-state 2) (= switch-state 3)) 0xFF 0x00))
-    (looprange led-index 0 led-status-num {
-        (setix led-status-color led-index (if (< led-index (/ led-status-num 2)) color-status-half1 color-status-half2))
+    (looprange led-index 0 (length color-list) {
+        (setix color-list led-index (if (< led-index (/ (length color-list) 2)) color-status-half1 color-status-half2))
     })
 })
 
-(defun set-led-strip-color (led-color color) {
-    (looprange led-index 0 (length led-color) {
-        (setix led-color led-index color)
+(defun set-led-strip-color (color-list color) {
+    (looprange led-index 0 (length color-list) {
+        (setix color-list led-index color)
     })
 })
 @const-end

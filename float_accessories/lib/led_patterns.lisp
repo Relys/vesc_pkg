@@ -24,14 +24,13 @@
 })
 
 (defun strobe-pattern (color-list strobe-index color) {
-    (var color (if (= strobe-index 0) color 0x00000000))
-    (set-led-strip-color color-list color)
+    (set-led-strip-color color-list (if (= strobe-index 0) color 0x00000000))
     (mod (+ strobe-index 1) 2)
 })
 
 (defun rave-pattern (color-list rave-index){
     (set-led-strip-color color-list (ix rainbow-colors rave-index))
-    (setq rave-index (mod (+ rave-index 1) (length rainbow-colors)))
+    (mod (+ rave-index 1) (length rainbow-colors))
 })
 
 (defun knight-rider-pattern (){

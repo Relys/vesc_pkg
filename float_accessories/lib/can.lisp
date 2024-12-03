@@ -168,26 +168,21 @@
                                 (def roll-angle (/ (to-float (bufget-i16 data 7)) 10))
                                 (var state-byte (bufget-u8 data 9))
                                 (setq state (bitwise-and state-byte 0x0F))
+                                ;(var sat-t (shr state-byte 4))
                                 (var switch-state-byte (bufget-u8 data 10))
-                                (var switch-state-temp (bitwise-and switch-state-byte 0x0F))
+                                (setq switch-state (bitwise-and switch-state-byte 0x0F))
+                                ;(var beep-reason-t (shr switch-state-byte 4))
                                 (setq handtest-mode (= (bitwise-and switch-state-byte 0x08) 0x08))
-                                (var footpad-adc1-t (bufget-u8 data 11))
-                                (var footpad-adc2-t (bufget-u8 data 12))
-                                (cond
-                                    ((= switch-state-temp 0) {
-                                        (setq switch-state 0)
+                                (var footpad-adc1-t (/ (to-float (bufget-u8 data 11)) 50))
+                                (var footpad-adc2-t (/ (to-float (bufget-u8 data 12)) 50))
+                                (if (= switch-state 2) {
+                                    (setq switch-state 3)
+                                })
+                                (if (= switch-state 1) {
+                                    (if (> footpad-adc2-t footpad-adc1-t) {
+                                        (setq switch-state 2)
                                     })
-                                    ((= switch-state-temp 1) {
-                                        (if (> footpad-adc1-t footpad-adc2-t){
-                                            (setq switch-state 1)
-                                        }{
-                                            (setq switch-state 2)
-                                        })
-                                    })
-                                    ((= switch-state-temp 2) {
-                                        (setq switch-state 3)
-                                    })
-                                )
+                                })
                                 (setq pitch-angle (/ (to-float (bufget-i16 data 19)) 10))
                                 (setq vin (/ (to-float (bufget-i16 data 22)) 10))
                                 (setq rpm (/ (to-float  (bufget-i16 data 24)) 10))

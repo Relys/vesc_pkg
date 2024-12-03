@@ -904,6 +904,7 @@ SpinBox {
                                             {text: "RGB", value: 1},
                                             {text: "GRBW", value: 2},
                                             {text: "RGBW", value: 3},
+                                            {text: "WRGB", value: 4},
                                         ]
                                         textRole: "text"
                                         valueRole: "value"
@@ -1026,6 +1027,7 @@ SpinBox {
                                             {text: "RGB", value: 1},
                                             {text: "GRBW", value: 2},
                                             {text: "RGBW", value: 3},
+                                            {text: "WRGB", value: 4},
                                         ]
                                         textRole: "text"
                                         valueRole: "value"
@@ -1152,6 +1154,7 @@ SpinBox {
                                             {text: "RGB", value: 1},
                                             {text: "GRBW", value: 2},
                                             {text: "RGBW", value: 3},
+                                            {text: "WRGB", value: 4},
                                         ]
                                         textRole: "text"
                                         valueRole: "value"
@@ -1310,6 +1313,7 @@ SpinBox {
                                             {text: "RGB", value: 1},
                                             {text: "GRBW", value: 2},
                                             {text: "RGBW", value: 3},
+                                            {text: "WRGB", value: 4},
                                         ]
                                         textRole: "text"
                                         valueRole: "value"

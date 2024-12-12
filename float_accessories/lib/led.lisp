@@ -86,6 +86,7 @@
 (def button-pattern-index)
 (def footpad-pattern-index)
 (def status-pattern-index)
+(def brake-pattern-index)
 
 (defun load-led-settings () {
     (setq led-enabled (get-config 'led-enabled))
@@ -145,6 +146,7 @@
     (setq button-pattern-index 0)
     (setq footpad-pattern-index 0)
     (setq status-pattern-index 0)
+    (setq brake-pattern-index 0)
     (def blend-count led-max-blend-count)
     (setq combined-pins nil)
     (setq led-current-brightness 0.0)
@@ -640,11 +642,7 @@
                     })
                 )
                 (if (and (= led-brake-light-enabled 1) (running-state) (!= state 5) (<= tot-current led-brake-light-min-amps)){
-                    (if (>= direction 0){
-                        (setq rear-pattern-index (strobe-pattern led-rear-color rear-pattern-index 0x00FF0000))
-                    }{
-                        (setq front-pattern-index (strobe-pattern led-front-color front-pattern-index 0x00FF0000))
-                    })
+                    (setq brake-pattern-index (strobe-pattern (if (>= direction 0) led-rear-color led-front-color) brake-pattern-index 0x00FF0000))
                 })
 
                 (if (display-battery-charging) {

@@ -28,14 +28,13 @@
 (def bms-status -1)
 (def bms-battery-type -1)
 (def bms-battery-cycles -1)
-(def bms-battery-health -1)
 (def is-charging -1)
 (def is-current-over-limit -1)
 (def is-battery-empty -1)
 (def is-battery-temp-out-of-range -1)
 (def is-battery-overcharged -1)
 (def serial -1)
-
+(def soc 100.0)
 
 (defun crypt (nonce-high nonce-low data start-offset len) {
     (var restore-byte (bufget-u8 counter 15))
@@ -143,30 +142,37 @@
 (defun parse-cell-voltage (data){
     (var cell-index 0)
     (var total-voltage 0)
+    (var v-cell-min (bufget-u16 data (if bms-use-crypto 6 4)))
+    (var v-cell-max v-cell-min)
     (if cell-count-uninit {
         (set-bms-val 'bms-cell-num (/ (- (buflen data) 8) 2))
         (setq cell-count-uninit false)
     })
 
+
     (looprange k (if bms-use-crypto 6 4) (- (buflen data) (+ (if bms-use-crypto 0 2) 3)) { ;Need to leave off end 16th cell for 15s BMS
         (if (eq (mod k 2) 0) {
             ;calculate voltage based soc based on first cell mv
             (if (and (= cell-index 0) (= bms-override-soc 1)) {
-                (set-bms-val 'bms-soc (/ (* (soc (bufget-u16 data k) (if bms-use-crypto 1 10))) 100.0))
+                (setq soc (/ (* (soc (bufget-u16 data k) (if bms-use-crypto 1 10))) 100.0))
+                (set-bms-val 'bms-soc soc)
             })
             (var current-cell (/ (bufget-u16 data k) (if bms-use-crypto 10000.0 1000.0)))
             (set-bms-val 'bms-v-cell cell-index current-cell)
             (setq cell-index (+ cell-index 1))
             (setq total-voltage (+ total-voltage current-cell))
+            (if (> current-cell v-cell-max) (setq v-cell-max current-cell))
+            (if (< current-cell v-cell-min) (setq v-cell-min current-cell))
         })
     })
     (set-bms-val 'bms-v-tot total-voltage)
+    ;(set-bms-val 'bms-v-cell-min v-cell-min) ;todo
+    ;(set-bms-val 'bms-v-cell-max v-cell-max) ;todo
 })
 
 (defun parse-soc (data){
     (if (= bms-override-soc 0) {
-        (var soc (/ (bufget-u8 data (if bms-use-crypto 6 4)) 100.0))
-        ;(print soc)
+        (setq soc (/ (bufget-u8 data (if bms-use-crypto 6 4)) 100.0))
         (if (> soc 1.0) (setq soc 1.0))
         (if (< soc 0.01) (setq soc 0.01))
         (set-bms-val 'bms-soc soc)
@@ -200,9 +206,13 @@
 
 (defun parse-temp (data) {
     (set-bms-val 'bms-temp-ic (bufget-i8 data (- (buflen data) 3)))
+    (var t-cell-max (bufget-i8 data (if bms-use-crypto 6 4)))
     (looprange k (if bms-use-crypto 6 4) (- (buflen data) 3) {
-        (set-bms-val 'bms-temps-adc (- k (if bms-use-crypto 6 4)) (bufget-i8 data k))
+        (var temp-val (bufget-i8 data k))
+        (if (> temp-val t-cell-max) (setq t-cell-max temp-val))
+        (set-bms-val 'bms-temps-adc (- k (if bms-use-crypto 6 4)) temp-val)
     })
+    (set-bms-val 'bms-temp-cell-max t-cell-max)
 })
 
 (defun parse-serial (data) {
@@ -221,7 +231,10 @@
 (defun parse-cycles-health (data) {
     (setq bms-battery-cycles (bufget-u16 data (if bms-use-crypto 6 4)))
     ;TODO No way to set SoH in Lisp?
-    (setq bms-battery-health (bufget-u8 data (if bms-use-crypto 8 6)))
+    (var soh (/ (bufget-u8 data (if bms-use-crypto 8 6)) 100.0))
+    (if (> soh 1.0) (setq soh 1.0))
+    (if (< soh 0.01) (setq soh 0.01))
+    ;(set-bms-val 'bms-soh soh) ;todo
 })
 
 (defunret process-cmd (command data ack handshake) {
@@ -384,7 +397,9 @@
             (setq start (+ start 1)) ; Move to the next byte if magic bytes not found
         })
     })
-    (if found-packet (send-bms-can))
+    (if found-packet {
+        (send-bms-can)
+    })
     (return (< cmd-ack 0));if we're looking for an ack we failed to find one
 })
 
@@ -450,7 +465,6 @@
 
     (uart-start 1 bms-rs485-ro-pin (if (= bms-rs485-chip 1) bms-rs485-di-pin -1) 115200);If GNSS is connected UART 1 must be used
     (set-bms-val 'bms-temp-adc-num 4)
-    (set-bms-val 'bms-temp-cell-max 45)
     (bufset-u8 magic 2 (if bms-use-crypto 0xbb 0xaa))
     (yield 100000);Gotta make sure uart is ready
     ;now we're cookin'

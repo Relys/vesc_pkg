@@ -150,7 +150,7 @@
     (var color-status-half1 (if (or (= switch-state 1) (= switch-state 3)) 0xFF 0x00))
     (var color-status-half2 (if (or (= switch-state 2) (= switch-state 3)) 0xFF 0x00))
     (looprange led-index 0 (length color-list) {
-        (setix color-list led-index (if (< led-index (/ (length color-list) 2)) color-status-half1 color-status-half2))
+        (setix color-list led-index (if (<= led-index (/ (length color-list) 2)) color-status-half1 color-status-half2))
     })
 })
 

@@ -34,7 +34,6 @@
 (def is-battery-temp-out-of-range -1)
 (def is-battery-overcharged -1)
 (def serial -1)
-(def soc 100.0)
 
 (defun crypt (nonce-high nonce-low data start-offset len) {
     (var restore-byte (bufget-u8 counter 15))
@@ -149,12 +148,11 @@
         (setq cell-count-uninit false)
     })
 
-
     (looprange k (if bms-use-crypto 6 4) (- (buflen data) (+ (if bms-use-crypto 0 2) 3)) { ;Need to leave off end 16th cell for 15s BMS
         (if (eq (mod k 2) 0) {
             ;calculate voltage based soc based on first cell mv
             (if (and (= cell-index 0) (= bms-override-soc 1)) {
-                (setq soc (/ (* (soc (bufget-u16 data k) (if bms-use-crypto 1 10))) 100.0))
+                (var soc (/ (* (soc (bufget-u16 data k) (if bms-use-crypto 1 10))) 100.0))
                 (set-bms-val 'bms-soc soc)
             })
             (var current-cell (/ (bufget-u16 data k) (if bms-use-crypto 10000.0 1000.0)))
@@ -166,13 +164,16 @@
         })
     })
     (set-bms-val 'bms-v-tot total-voltage)
-    ;(set-bms-val 'bms-v-cell-min v-cell-min) ;todo
-    ;(set-bms-val 'bms-v-cell-max v-cell-max) ;todo
+    ((var fw-num (+ (first (sysinfo 'fw-ver)) (* (second (sysinfo 'fw-ver)) 0.01))))
+    (if (>= fw-num 6.06){
+        (set-bms-val 'bms-v-cell-min v-cell-min)
+        (set-bms-val 'bms-v-cell-max v-cell-max)
+    })
 })
 
 (defun parse-soc (data){
     (if (= bms-override-soc 0) {
-        (setq soc (/ (bufget-u8 data (if bms-use-crypto 6 4)) 100.0))
+        (var soc (/ (bufget-u8 data (if bms-use-crypto 6 4)) 100.0))
         (if (> soc 1.0) (setq soc 1.0))
         (if (< soc 0.01) (setq soc 0.01))
         (set-bms-val 'bms-soc soc)
@@ -234,7 +235,7 @@
     (var soh (/ (bufget-u8 data (if bms-use-crypto 8 6)) 100.0))
     (if (> soh 1.0) (setq soh 1.0))
     (if (< soh 0.01) (setq soh 0.01))
-    ;(set-bms-val 'bms-soh soh) ;todo
+    (set-bms-val 'bms-soh soh)
 })
 
 (defunret process-cmd (command data ack handshake) {
@@ -397,9 +398,7 @@
             (setq start (+ start 1)) ; Move to the next byte if magic bytes not found
         })
     })
-    (if found-packet {
-        (send-bms-can)
-    })
+    (if found-packet (send-bms-can))
     (return (< cmd-ack 0));if we're looking for an ack we failed to find one
 })
 
@@ -416,7 +415,6 @@
     (uart-stop)
     (sleep 1)
     (if bms-use-crypto{
-        (var fw-num (+ (first (sysinfo 'fw-ver)) (* (second (sysinfo 'fw-ver)) 0.01)))
         (if (< fw-num 6.06){
             (send-msg "hw-express needs to be running 6.06")
             (return false)

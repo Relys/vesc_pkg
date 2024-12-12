@@ -21,11 +21,12 @@
 (read-eval-program bms)
 (import "lib/pubmote.lisp" 'pubmote)
 (read-eval-program pubmote)
+
+(def fw-num (+ (first (sysinfo 'fw-ver)) (* (second (sysinfo 'fw-ver)) 0.01)))
 (defun main () {
     (setup)
     (init)
 })
-
 (defun setup () {
     (event-register-handler (spawn event-handler))
     (event-enable 'event-data-rx)
@@ -33,7 +34,7 @@
     (if (!= (str-cmp (to-str (sysinfo 'hw-type)) "hw-express") 0) {
         (exit-error "Not running on hw-express")
     })
-    (var fw-num (+ (first (sysinfo 'fw-ver)) (* (second (sysinfo 'fw-ver)) 0.01)))
+
     (if (< fw-num 6.05) (exit-error "hw-express needs to be running 6.05"))
 
     ; Restore settings if version number does not match

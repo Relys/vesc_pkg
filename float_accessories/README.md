@@ -22,6 +22,6 @@ Now with BMS and Pubmote (beta)
 
 <H3>BUILD INFO</H3>
 
-Version 2.0
+Version 2.2
 
 Source code can be found here:  <a href='https://github.com/relys/vesc%5Fpkg'>https://github.com/relys/vesc_pkg</a>

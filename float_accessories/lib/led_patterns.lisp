@@ -2,8 +2,6 @@
 
 @const-start
 (def rainbow-colors '(0x00FF0000 0x00FFFF00 0x0000FF00 0x0000FFFF 0x000000FF 0x00FF00FF))
-(def knight-rider-position 0)
-(def knight-rider-direction 1)
 
 (defun led-float-disabled (color-list) {
     (var led-num (length color-list))
@@ -33,19 +31,18 @@
     (mod (+ rave-index 1) (length rainbow-colors))
 })
 
-(defun knight-rider-pattern (){
-    (var total-leds (+ (length led-front-color) (length led-rear-color)))
-    (looprange i 0 total-leds {
-        (var distance (abs (- i knight-rider-position)))
+(defun knight-rider-pattern (color-list color-index) {
+    (var num-leds (length color-list))
+    (var pos (abs (- num-leds (mod (* color-index 2) (* num-leds 2)))))
+
+    (looprange i 0 num-leds {
+        (var distance (abs (- i pos)))
         (var intensity (max 0 (- 255 (* distance 51))))
         (var color (color-make intensity 0 0))
-        (if (< i (length led-front-color))
-            (setix led-front-color i color)
-            (setix led-rear-color (- i (length led-front-color)) color))
-        })
-    (setq knight-rider-position (+ knight-rider-position knight-rider-direction))
-    (if (or (>= knight-rider-position total-leds) (< knight-rider-position 0))
-    (setq knight-rider-direction (* knight-rider-direction -1)))
+        (setix color-list i color)
+    })
+
+    (mod (+ color-index 1) num-leds)
 })
 
 (defun battery-pattern (color-list) {

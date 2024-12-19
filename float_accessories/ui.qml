@@ -391,7 +391,7 @@ ScrollView {
                 }
                 ColumnLayout {
                     id: ledHighBeamLayout
-                    visible: ledOn.checked && (((ledFrontStripType.currentIndex > 1 && ledFrontStripType.currentIndex < 7) || (ledFrontStripType.currentIndex === 7 && ledFrontHighbeamPin.value >= 0)) || ((ledRearStripType.currentIndex > 1 && ledRearStripType.currentIndex < 7) || (ledRearStripType.currentIndex === 7 && ledRearHighbeamPin.value >= 0)))
+                    visible: ledOn.checked && (((ledFrontStripType.currentIndex > 1 && ledFrontStripType.currentIndex != 7) || (ledFrontStripType.currentIndex === 7 && ledFrontHighbeamPin.value >= 0)) || ((ledRearStripType.currentIndex > 1 && ledRearStripType.currentIndex != 7) || (ledRearStripType.currentIndex === 7 && ledRearHighbeamPin.value >= 0)))
                     spacing: 10
 
                     CheckBox {
@@ -650,7 +650,7 @@ Slider {
                                         {text: "Cyan/Magenta", value: 2},
                                         {text: "Blue/Green", value: 3},
                                         {text: "Yellow/Green", value: 4},
-                                        {text: "RGB Fade", value: 5},
+                                        {text: "Rainbow Chase", value: 5},
                                         {text: "Strobe", value: 6},
                                         {text: "Rave", value: 7},
                                         {text: "Mullet", value: 8},
@@ -727,7 +727,7 @@ Slider {
                                     id: ledModeButton
                                     Layout.fillWidth: true
                                     model: [
-                                        {text: "RGB Fade", value: 0},
+                                        {text: "Rainbow Chase", value: 0},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -745,7 +745,7 @@ Slider {
                                     id: ledModeFootpad
                                     Layout.fillWidth: true
                                     model: [
-                                        {text: "RGB Fade", value: 0}
+                                        {text: "Rainbow Chase", value: 0}
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -948,6 +948,8 @@ SpinBox {
                                         {text: "JetFleet H4 (no limit DCDC)", value: 5},
                                         {text: "JetFleet GT", value: 6},
                                         {text: "Stock GT", value: 7},
+                                        {text: "Avaspark Laserbeam V2", value: 8},
+                                        {text: "Avaspark Laserbeam V2 Pint", value: 9},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -1077,6 +1079,8 @@ SpinBox {
                                         {text: "JetFleet H4 (no limit DCDC)", value: 5},
                                         {text: "JetFleet GT", value: 6},
                                         {text: "Stock GT", value: 7},
+                                        {text: "Avaspark Laserbeam V2", value: 8},
+                                        {text: "Avaspark Laserbeam V2 Pint", value: 9},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -1658,6 +1662,7 @@ TextArea {
           "<p>Now with BMS and Pubmote (beta)</p>" +
 
           "<p><b>BUILD INFO</b></p>" +
+		  "<p>Version 2.2</p>" +
           "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
@@ -1744,6 +1749,14 @@ TextArea {
                 ledFrontNum.value = 11
                 ledFrontType.currentIndex = 2
                 break
+            case 8: // Avaspark Laserbeam V3
+                ledFrontNum.value = 13
+                ledFrontType.currentIndex = 0
+                break
+            case 9: // Avaspark Laserbeam V3 Pint
+                ledFrontNum.value = 10
+                ledFrontType.currentIndex = 0
+                break
             default:
                 // Do nothing, keep user-defined values
         }
@@ -1778,6 +1791,14 @@ TextArea {
             case 7: // Stock GT
                 ledRearNum.value = 11
                 ledRearType.currentIndex = 2
+                break
+            case 8: // Avaspark Laserbeam V2
+                ledRearNum.value = 13
+                ledRearType.currentIndex = 0
+                break
+            case 9: // Avaspark Laserbeam V2 Pint
+                ledRearNum.value = 10
+                ledRearType.currentIndex = 0
                 break
             default:
                 // Do nothing, keep user-defined values

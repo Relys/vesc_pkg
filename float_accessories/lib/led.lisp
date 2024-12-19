@@ -180,10 +180,10 @@
     (var front-highbeam-leds 0)
     (var rear-highbeam-leds 0)
     (cond
-        ((or (= led-front-strip-type 2) (= led-front-strip-type 3)) {
+        ((or (= led-front-strip-type 2) (= led-front-strip-type 3) (= led-front-strip-type 8) (= led-front-strip-type 9)) {
              (setq front-highbeam-leds (+ front-highbeam-leds 1))
         })
-        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3)) {
+        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3) (= led-rear-strip-type 8) (= led-rear-strip-type 9)) {
              (setq rear-highbeam-leds (+ rear-highbeam-leds 1))
         })
         ((or (= led-front-strip-type 4) (= led-front-strip-type 5) (= led-front-strip-type 6)) {
@@ -373,7 +373,7 @@
     })
 
     (cond
-        ((or (= led-front-strip-type 2) (= led-front-strip-type 3)) {
+        ((or (= led-front-strip-type 2) (= led-front-strip-type 3) (= led-front-strip-type 8) (= led-front-strip-type 9)) {
             (if (and (<= led-dim-on-highbeam-brightness 0.0) (>= direction 0) (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
                 (setq led-current-front-color (append (list front-color-highbeam) (mklist led-front-num 0)))
             }{
@@ -409,7 +409,7 @@
         })
     )
     (cond
-        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3)) {
+        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3) (= led-rear-strip-type 8) (= led-rear-strip-type 9)) {
             (if (and (<= led-dim-on-highbeam-brightness 0.0) (< direction 0) (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
                 (setq led-current-rear-color (append (list rear-color-highbeam) (mklist led-rear-num 0)))
             }{
@@ -633,7 +633,9 @@
                         (setq rear-pattern-index (rave-pattern led-rear-color rear-pattern-index))
                     })
                     ((= current-led-mode 9) {
-                        (knight-rider-pattern)
+                        (setq rear-pattern-index front-pattern-index)
+                        (setq front-pattern-index (knight-rider-pattern led-front-color front-pattern-index))
+                        (setq rear-pattern-index (knight-rider-pattern led-rear-color rear-pattern-index))
                     })
                     ((= current-led-mode 10) {
                         (setq rear-pattern-index front-pattern-index)

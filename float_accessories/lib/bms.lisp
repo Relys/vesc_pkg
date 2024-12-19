@@ -164,7 +164,6 @@
         })
     })
     (set-bms-val 'bms-v-tot total-voltage)
-    ((var fw-num (+ (first (sysinfo 'fw-ver)) (* (second (sysinfo 'fw-ver)) 0.01))))
     (if (>= fw-num 6.06){
         (set-bms-val 'bms-v-cell-min v-cell-min)
         (set-bms-val 'bms-v-cell-max v-cell-max)

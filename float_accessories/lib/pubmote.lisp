@@ -6,6 +6,7 @@
 (def pairing-state 0)
 (def esp-now-remote-mac '())
 (def pubmote-pairing-timer 31)
+(def uni-mac '(255 255 255 255 255 255)) ; Universal mac (all devices)
 (defunret init-pubmote () {
     (if (not wifi-enabled-on-boot){
         (send-msg "WiFi was disabled on boot. Please enable and reboot to use pubmote.")
@@ -16,6 +17,8 @@
     (esp-now-start)
     (esp-now-del-peer esp-now-remote-mac)
     (esp-now-add-peer esp-now-remote-mac)
+    (esp-now-del-peer uni-mac)
+    (esp-now-add-peer uni-mac)
     (return true)
 })
 
@@ -74,25 +77,22 @@
                 (if pubmote-exit-flag {
                     (break)
                 })
-                (if (and (> (secs-since pubmote-pairing-timer) 30 ) (>= pairing-state 2)){
+                (if (and (> (secs-since pubmote-pairing-timer) 30 ) (>= pairing-state 1)) {
                     (pair-pubmote -2)
                 }) ;timeout pairing process after 30 seconds
-                (if (= pairing-state 1){
-                    (esp-now-del-peer esp-now-remote-mac)
-                    (setq esp-now-remote-mac '(255 255 255 255 255 255))
-                    (esp-now-add-peer esp-now-remote-mac)
+                (if (= pairing-state 1) {
+
                     (var pairing-data (bufcreate 6))
                     (var local-mac (get-mac-addr))
                     (looprange i 0 (buflen pairing-data) {
                         (bufset-u8 pairing-data i (ix local-mac i))
                     })
                     ;(bufset-u8 data 0 69)
-                    (esp-now-send esp-now-remote-mac pairing-data)
+                    ;(print "sending pairing info")
+                    (esp-now-send uni-mac pairing-data)
                     (free pairing-data)
-                    (esp-now-del-peer esp-now-remote-mac)
-                    (setq pairing-state 2)
                 })
-                (if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0)){
+                (if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0)) {
                     (bufset-u8 data 0 69) ; Mode
                     (bufset-u8 data 1 fault-code)
                     (bufset-i16 data 2 (floor (* pitch-angle 10)))
@@ -132,7 +132,7 @@
 
 (defun pubmote-rx (src des data rssi) {
     (if (get-config 'pubmote-enabled){
-        (if (and (= pairing-state 0) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) {
+        (if (and (= pairing-state 0) (eq esp-now-remote-mac src) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) {
             (atomic {
                 (setq pubmote-last-activity-time (systime))
                 ;(print (list "Received" src des data rssi))
@@ -148,7 +148,7 @@
                 })
             })
         }{
-            (if (= pairing-state 2) {
+            (if (= pairing-state 1) {
                 (setq esp-now-remote-mac src)
                 (esp-now-add-peer esp-now-remote-mac)
                 (var tmpbuf (bufcreate 4))

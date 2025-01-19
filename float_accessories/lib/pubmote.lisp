@@ -14,6 +14,10 @@
     })
     ;(wifi-set-chan (wifi-get-chan))
     (setq esp-now-remote-mac (append (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-a)) (take (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-b)) 2)));
+    ; Read as bytes, convert to i so we can compare lists
+    (loopfor i 0 (< i(length esp-now-remote-mac)) (+ i 1) {
+        (setix esp-now-remote-mac i (to-i (ix esp-now-remote-mac i)))
+    })
     (esp-now-start)
     (esp-now-del-peer esp-now-remote-mac)
     (esp-now-add-peer esp-now-remote-mac)
@@ -103,7 +107,7 @@
                     (bufset-i16 data 10 (floor rpm))
                     (bufset-i16 data 12 (floor (* speed 10)))
                     (bufset-i16 data 14 (floor (* tot-current 10)))
-                    (bufset-u8 data 16 (floor (* (+ duty-cycle-now 0.5) 100)))
+                    (bufset-u8 data 16 (floor (* (+ (abs duty-cycle-now) 0.5) 100)))
                     (bufset-f32 data 17 distance-abs 'little-endian)
                     (bufset-u8 data 21 (floor (* fet-temp-filtered 2)))
                     (bufset-u8 data 22 (floor (* motor-temp-filtered 2)))

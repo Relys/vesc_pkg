@@ -93,6 +93,7 @@
 (def pubmote-context-id -1)
 (def pubmote-exit-flag nil)
 (def pubmote-last-activity-time (systime))
+(def wifi-current-channel -1)
 (def led-context-id -1)
 (def led-exit-flag nil)
 (def led-last-activity-time (systime))
@@ -438,6 +439,8 @@
         ((eq type 'b) (eeprom-store-i addr val))
 )))
 (defun status () {
+    (setq wifi-current-channel (wifi-get-chan))
+    
     (var status-string "float-stats ")
     (setq status-string (str-merge status-string (str-from-n (if (< (secs-since can-last-activity-time) 1) 1 0) "%d ")))
     (setq status-string (str-merge status-string (str-from-n (if (< (secs-since pubmote-last-activity-time) 1) 1 0) "%d ")))
@@ -445,6 +448,7 @@
     (setq status-string (str-merge status-string (str-from-n bms-status "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-type "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-cycles "%d ")))
+    (setq status-string (str-merge status-string (str-from-n wifi-current-channel "%d ")))
     (send-data status-string)
 })
 

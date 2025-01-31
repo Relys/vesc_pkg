@@ -531,6 +531,13 @@ ScrollView {
                     }
 
                     Text {
+                        id: wifiStatus
+                        Layout.fillWidth: true
+                        color: Utility.getAppHexColor("lightText")
+                        text: "WiFi Channel: Unknown"
+                    }
+
+                    Text {
                         id: bmsStatus
                         Layout.fillWidth: true
                         color: Utility.getAppHexColor("lightText")
@@ -2063,6 +2070,8 @@ function makeArgStr() {
                 bmsBatteryCycles.text = "Battery Cycles: " + Number(tokens[6])
                 lastStatusTime = 0  // Reset the timer when status is received
                 statusTimeout = false
+                var wifiChannel = Number(tokens[7])
+                wifiStatus.text = "WiFi Status: " + (wifiChannel ? wifiChannel : "Not Connected")
             } else if (str.startsWith("control")) {
                 var tokens = str.split(" ")
                 ledOn.checked = Number(tokens[1])

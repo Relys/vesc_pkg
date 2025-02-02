@@ -1669,7 +1669,7 @@ TextArea {
           "<p>Now with BMS and Pubmote (beta)</p>" +
 
           "<p><b>BUILD INFO</b></p>" +
-		  "<p>Version 2.2</p>" +
+		  "<p>Version 2.5</p>" +
           "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
     Layout.fillWidth: true
     wrapMode: Text.WordWrap

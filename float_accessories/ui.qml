@@ -1,4 +1,3 @@
-import Vedder.vesc.vescinterface 1.0
 import "qrc:/mobile"
 import QtQuick 2.12
 import QtQuick.Controls 2.12
@@ -6,6 +5,7 @@ import QtQuick.Layouts 1.3
 import Vedder.vesc.commands 1.0
 import Vedder.vesc.configparams 1.0
 import Vedder.vesc.utility 1.0
+import Vedder.vesc.vescinterface 1.0
 
 Item {
     id: container
@@ -20,34 +20,44 @@ Item {
     property bool acceptTOS: false
     property int lastStatusTime: 0
     property bool statusTimeout: false
+
     Component.onCompleted: {
-        if (!(VescIf.getLastFwRxParams().hw.includes("Express") || VescIf.getLastFwRxParams().hw.includes("Avaspark")) || VescIf.getLastFwRxParams().hw.includes("rESCue")) {
+        if (
+            !(VescIf.getLastFwRxParams().hw.includes("Express")
+            || VescIf.getLastFwRxParams().hw.includes("Avaspark"))
+            || VescIf.getLastFwRxParams().hw.includes("rESCue")
+        ) {
             VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express, Avaspark or rESCue board", false, false)
         }
+
         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)")
     }
 
-Timer {
-    id: statusCheckTimer
-    interval: 1000 // Check status every second
-    running: true
-    repeat: true
-    onTriggered: {
-        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(status)")
+    Timer {
+        id: statusCheckTimer
+        interval: 1000 // Check status every second
+        running: true
+        repeat: true
+        onTriggered: {
+            sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(status)")
             lastStatusTime++
+            
             if (lastStatusTime > 2) { // 2 second timeout
                 statusTimeout = true
             }
+        }
     }
-}
+
     // Timer for 30-second timeout
     Timer {
         id: pairingTimeoutTimer
         interval: 1000  // 1 second
         running: false
         repeat: true
+
         onTriggered: {
             remainingTime--;  // Decrease the remaining time by 1 second
+
             if (remainingTime <= 0) {
                 pairingTimeout = true;
                 sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -2)");  // Automatically reject if time runs out
@@ -55,7 +65,8 @@ Timer {
             }
         }
     }
-  // Popup for Pubmote pairing confirmation
+
+    // Popup for Pubmote pairing confirmation
     Popup {
         id: pubmotePairPopup
         modal: true
@@ -133,71 +144,72 @@ Timer {
             }
         }
     }
-Popup {
-    id: keySettingPopup
-    modal: true
-    focus: true
-    visible: false
-    width: parent.width * 0.8
-    height: parent.height * 0.3
-    anchors.centerIn: parent
 
-    background: Rectangle {
-        color: "black"
-        radius: 10
-    }
+    Popup {
+        id: keySettingPopup
+        modal: true
+        focus: true
+        visible: false
+        width: parent.width * 0.8
+        height: parent.height * 0.3
+        anchors.centerIn: parent
 
-    contentItem: ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 20
-        spacing: 10
-
-        Text {
-            text: "Set Keys"
-            color: "white"
-            font.pointSize: 16
-            Layout.alignment: Qt.AlignHCenter
+        background: Rectangle {
+            color: "black"
+            radius: 10
         }
 
-        TextField {
-            id: keyInput
-            placeholderText: "Enter Key (16 hex bytes, e.g., FFAABBCC...)"
-            Layout.fillWidth: true
-        }
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 10
 
-        TextField {
-            id: counterInput
-            placeholderText: "Enter Counter (16 hex bytes, e.g., FFAABBCC...)"
-            Layout.fillWidth: true
-        }
+            Text {
+                text: "Set Keys"
+                color: "white"
+                font.pointSize: 16
+                Layout.alignment: Qt.AlignHCenter
+            }
 
-        Button {
-            id: submitButton
-            text: "Submit"
-            Layout.alignment: Qt.AlignHCenter
-            onClicked: {
-                var keyHex = keyInput.text.replace(/[^0-9A-Fa-f]/g, '');
-                var counterHex = counterInput.text.replace(/[^0-9A-Fa-f]/g, '');
+            TextField {
+                id: keyInput
+                placeholderText: "Enter Key (16 hex bytes, e.g., FFAABBCC...)"
+                Layout.fillWidth: true
+            }
 
-                if (keyHex.length === 32 && counterHex.length === 32) {
-                    console.log("Key: " + keyHex);
-                    console.log("Counter: " + counterHex);
+            TextField {
+                id: counterInput
+                placeholderText: "Enter Counter (16 hex bytes, e.g., FFAABBCC...)"
+                Layout.fillWidth: true
+            }
 
-                    var keyList = hexStringToLispList(keyHex);
-                    var counterList = hexStringToLispList(counterHex);
+            Button {
+                id: submitButton
+                text: "Submit"
+                Layout.alignment: Qt.AlignHCenter
+                onClicked: {
+                    var keyHex = keyInput.text.replace(/[^0-9A-Fa-f]/g, '');
+                    var counterHex = counterInput.text.replace(/[^0-9A-Fa-f]/g, '');
 
-                    var sendKeysString = "(send-keys " + keyList + " " + counterList + ")";
+                    if (keyHex.length === 32 && counterHex.length === 32) {
+                        console.log("Key: " + keyHex);
+                        console.log("Counter: " + counterHex);
 
-                    console.log("Sending: " + sendKeysString);
-                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + sendKeysString);
-                    keySettingPopup.close();
-                } else {
-                    console.error("Invalid input: Both key and counter must result in 4 uint32 values each")
+                        var keyList = hexStringToLispList(keyHex);
+                        var counterList = hexStringToLispList(counterHex);
+
+                        var sendKeysString = "(send-keys " + keyList + " " + counterList + ")";
+                        console.log("Sending: " + sendKeysString);
+                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + sendKeysString);
+                        
+                        keySettingPopup.close();
+                    } else {
+                        console.error("Invalid input: Both key and counter must result in 4 uint32 values each")
+                    }
                 }
             }
         }
-        }
-        }
+    }
 
     Popup {
         id: termsPopup
@@ -229,13 +241,13 @@ Popup {
                         id: termsText
                         textFormat: Text.RichText
                         text: "<p>WARNING NOTICE:</p>" +
-"<p>This code is released as part of legitimate security research and is intended to enable interoperability between a specific Battery Management System (BMS) and aftermarket Electronic Speed Controllers (ESCs) for a widely used motorized land vehicle. This vehicle is often utilized as a mobility aid for individuals with disabilities, such as those with Hidradenitis Suppurativa, which prevents the use of traditional mobility devices.</p>"+
-"<p>The publication of this code is an exercise of the right to free speech and expression, protected under the First Amendment of the U.S. Constitution. Furthermore, this code is released in accordance with both the security research exception under DMCA Section 1201(g) and the exemption for motorized land vehicles, which allows the circumvention of technological protection measures (TPMs) for the purposes of repair, modification, and interoperability under the Librarian of Congress's 2015 ruling and subsequent triennial exemptions. This exemption applies specifically to vehicle software, including Battery Management Systems, and permits this work for diagnostic and modification purposes.</p>"+
-"<p>This system lacks manufacturer-provided documentation or tools for repair. Currently, consumers are forced to replace the entire battery, enclosure, and BMS at significant cost, rather than repairing individual components. We are providing the necessary documentation and tools to facilitate the repair of these systems, enabling consumers to extend the life of their devices.</p>"+
-"<p>This publication is further supported by the California Right to Repair Act (SB 244), which took full effect on July 1, 2024. Under this law, consumers and independent repair providers are entitled to access the tools, parts, and documentation necessary to perform repairs on electronics and appliances sold or used in California, reinforcing the legality and public interest of this code publication. Although some exceptions apply, this law affirms the right to repair motorized vehicles, aligning with the purpose of this research and promoting repairability and consumer choice.</p>"+
-"<p>Additionally, this publication is protected under Washington’s Revised Code of Washington (RCW) § 4.24.525 and California Code of Civil Procedure § 425.16, which are anti-SLAPP laws designed to prevent lawsuits aimed at intimidating or silencing lawful speech on matters of public interest. Any attempt to interfere with or litigate against the publication of this code may result in the dismissal of such legal actions, with the imposition of attorney’s fees and statutory damages.</p>"+
-"<p>Furthermore, the motor land vechicle this BMS resides in had its advertised speed reduced during a software update for the haptic buzz feature. This change constitutes a violation of Article 6(1)(a) of the EU Directive 2005/29/EC on Unfair Commercial Practices, which prohibits misleading actions that affect the consumer’s decision to purchase or retain a product. Reducing the performance of previously purchased products, is deemed unfair under EU law, particularly as consumers were not informed or compensated for this loss of functionality.</p>"+
-"<p>Moreover, the haptic feedback feature remains insufficiently implemented. On uneven terrains such as trails, the vibration cannot be felt effectively, and the audio feedback is may sometimes be too quiet to be useful, especially for individuals with disabilities like hearing impairments. This code addresses these deficiencies by allowing use with ESCs that allow real-time interoperability with third-party phone applications that provide customizable alerts through speakers, or headphones, improving accessibility, safety, and overall user experience."
+                            "<p>This code is released as part of legitimate security research and is intended to enable interoperability between a specific Battery Management System (BMS) and aftermarket Electronic Speed Controllers (ESCs) for a widely used motorized land vehicle. This vehicle is often utilized as a mobility aid for individuals with disabilities, such as those with Hidradenitis Suppurativa, which prevents the use of traditional mobility devices.</p>" +
+                            "<p>The publication of this code is an exercise of the right to free speech and expression, protected under the First Amendment of the U.S. Constitution. Furthermore, this code is released in accordance with both the security research exception under DMCA Section 1201(g) and the exemption for motorized land vehicles, which allows the circumvention of technological protection measures (TPMs) for the purposes of repair, modification, and interoperability under the Librarian of Congress's 2015 ruling and subsequent triennial exemptions. This exemption applies specifically to vehicle software, including Battery Management Systems, and permits this work for diagnostic and modification purposes.</p>" +
+                            "<p>This system lacks manufacturer-provided documentation or tools for repair. Currently, consumers are forced to replace the entire battery, enclosure, and BMS at significant cost, rather than repairing individual components. We are providing the necessary documentation and tools to facilitate the repair of these systems, enabling consumers to extend the life of their devices.</p>" +
+                            "<p>This publication is further supported by the California Right to Repair Act (SB 244), which took full effect on July 1, 2024. Under this law, consumers and independent repair providers are entitled to access the tools, parts, and documentation necessary to perform repairs on electronics and appliances sold or used in California, reinforcing the legality and public interest of this code publication. Although some exceptions apply, this law affirms the right to repair motorized vehicles, aligning with the purpose of this research and promoting repairability and consumer choice.</p>" +
+                            "<p>Additionally, this publication is protected under Washington’s Revised Code of Washington (RCW) § 4.24.525 and California Code of Civil Procedure § 425.16, which are anti-SLAPP laws designed to prevent lawsuits aimed at intimidating or silencing lawful speech on matters of public interest. Any attempt to interfere with or litigate against the publication of this code may result in the dismissal of such legal actions, with the imposition of attorney’s fees and statutory damages.</p>" +
+                            "<p>Furthermore, the motor land vehicle this BMS resides in had its advertised speed reduced during a software update for the haptic buzz feature. This change constitutes a violation of Article 6(1)(a) of the EU Directive 2005/29/EC on Unfair Commercial Practices, which prohibits misleading actions that affect the consumer’s decision to purchase or retain a product. Reducing the performance of previously purchased products, is deemed unfair under EU law, particularly as consumers were not informed or compensated for this loss of functionality.</p>" +
+                            "<p>Moreover, the haptic feedback feature remains insufficiently implemented. On uneven terrains such as trails, the vibration cannot be felt effectively, and the audio feedback is may sometimes be too quiet to be useful, especially for individuals with disabilities like hearing impairments. This code addresses these deficiencies by allowing use with ESCs that allow real-time interoperability with third-party phone applications that provide customizable alerts through speakers, or headphones, improving accessibility, safety, and overall user experience."
                         color: "white"
                         wrapMode: Text.Wrap
                         onLinkActivated: function(url) {
@@ -280,16 +292,18 @@ Popup {
             }
         }
     }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
 
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                color: Utility.getAppHexColor("lightText")
-                font.pointSize: 20
-                text: "Float Accessories"
-            }
+        Text {
+            Layout.alignment: Qt.AlignHCenter
+            color: Utility.getAppHexColor("lightText")
+            font.pointSize: 20
+            text: "Float Accessories"
+        }
+
         TabBar {
             id: tabBar
             Layout.fillWidth: true
@@ -297,352 +311,402 @@ Popup {
             TabButton {
                 text: qsTr("Control")
             }
+
             TabButton {
                 text: qsTr("Config")
             }
+
             TabButton {
                 text: qsTr("Settings")
             }
+
             TabButton {
                 text: qsTr("About")
             }
         }
-TabBar {
-    id: tabBar2
-    Layout.fillWidth: true
-    visible: tabBar.currentIndex === 1
 
-    // Update enabled indices when checkboxes change
-    Component.onCompleted: updateEnabledIndices()
+        TabBar {
+            id: tabBar2
+            Layout.fillWidth: true
+            visible: tabBar.currentIndex === 1
 
-    Connections {
-        target: ledEnabled
-        function onCheckedChanged() { updateEnabledIndices() }
-    }
-    Connections {
-        target: pubmoteEnabled
-        function onCheckedChanged() { updateEnabledIndices() }
-    }
-    Connections {
-        target: bmsEnabled
-        function onCheckedChanged() { updateEnabledIndices() }
-    }
+            // Update enabled indices when checkboxes change
+            Component.onCompleted: updateEnabledIndices()
+
+            Connections {
+                target: ledEnabled
+                function onCheckedChanged() { updateEnabledIndices() }
+            }
+
+            Connections {
+                target: pubmoteEnabled
+                function onCheckedChanged() { updateEnabledIndices() }
+            }
+
+            Connections {
+                target: bmsEnabled
+                function onCheckedChanged() { updateEnabledIndices() }
+            }
+
             TabButton {
                 text: qsTr("LED")
                 enabled: ledEnabled.checked
             }
+
             TabButton {
                 text: qsTr("Pubmote")
                 enabled: pubmoteEnabled.checked
             }
+
             TabButton {
                 text: qsTr("BMS")
                 enabled: bmsEnabled.checked
             }
         }
+
         // Stack Layout
         StackLayout {
             id: stackLayout
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: tabBar.currentIndex
-// LED Control Tab
-ScrollView {
-    clip: true
-    ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-    ColumnLayout {
-        width: stackLayout.width
-        spacing: 10
-        Timer {
-            id: debounceTimer
-            interval: 500  // Half a second (500ms)
-            repeat: false
-            onTriggered: {
-                applyControlChanges()
-            }
-        }
+            // LED Control Tab
+            ScrollView {
+                clip: true
+                ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
-        // Stack Layout
-        StackLayout {
-            id: stackLayout2
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            currentIndex: tabBar2.currentIndex
-            }
-
-
-        GroupBox {
-            title: "LED Control"
-            Layout.fillWidth: true
-            visible: ledEnabled.checked
-
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 10
-
-                CheckBox {
-                    id: ledOn
-                    text: "LED On"
-                    checked: true
-                    onCheckedChanged: {
-                        handleDebouncedChange()
-                    }
-                }
                 ColumnLayout {
-                    id: ledHighBeamLayout
-                    visible: ledOn.checked && (((ledFrontStripType.currentIndex > 1 && ledFrontStripType.currentIndex != 7) || (ledFrontStripType.currentIndex === 7 && ledFrontHighbeamPin.value >= 0)) || ((ledRearStripType.currentIndex > 1 && ledRearStripType.currentIndex != 7) || (ledRearStripType.currentIndex === 7 && ledRearHighbeamPin.value >= 0)))
+                    width: stackLayout.width
                     spacing: 10
 
-                    CheckBox {
-                        id: ledHighbeamOn
-                        text: "LED Highbeam On"
-                        checked: true
-                        onCheckedChanged: {
-                            handleDebouncedChange()
+                    Timer {
+                        id: debounceTimer
+                        interval: 500  // Half a second (500ms)
+                        repeat: false
+                        onTriggered: {
+                            applyControlChanges()
                         }
                     }
 
-                }
-                ColumnLayout {
-                    id: ledOnLayout
-                    visible: ledOn.checked
-                    spacing: 10
-
-                    Text {
-                        color: Utility.getAppHexColor("lightText")
-                        text: "Brightness"
+                    // Stack Layout
+                    StackLayout {
+                        id: stackLayout2
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        currentIndex: tabBar2.currentIndex
                     }
 
-                    Slider {
-                        id: ledBrightness
-                        from: 0.0
-                        to: 1.0
-                        value: 0.6
-                        onValueChanged: {
-                            handleDebouncedChange()
+                    GroupBox {
+                        title: "LED Control"
+                        Layout.fillWidth: true
+                        visible: ledEnabled.checked
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
+
+                            CheckBox {
+                                id: ledOn
+                                text: "LED On"
+                                checked: true
+                                onCheckedChanged: {
+                                    handleDebouncedChange()
+                                }
+                            }
+
+                            ColumnLayout {
+                                id: ledHighBeamLayout
+                                visible: (
+                                    ledOn.checked
+                                    && (
+                                        (
+                                            (
+                                                ledFrontStripType.currentIndex > 1
+                                                && ledFrontStripType.currentIndex != 7
+                                            )
+                                            || (
+                                                ledFrontStripType.currentIndex === 7
+                                                && ledFrontHighbeamPin.value >= 0
+                                            )
+                                        )
+                                        || (
+                                            (
+                                                ledRearStripType.currentIndex > 1
+                                                && ledRearStripType.currentIndex != 7
+                                            )
+                                            || (
+                                                ledRearStripType.currentIndex === 7
+                                                && ledRearHighbeamPin.value >= 0
+                                            )
+                                        )
+                                    )
+                                )
+                                spacing: 10
+
+                                CheckBox {
+                                    id: ledHighbeamOn
+                                    text: "LED Highbeam On"
+                                    checked: true
+                                    onCheckedChanged: {
+                                        handleDebouncedChange()
+                                    }
+                                }
+                            }
+                            
+                            ColumnLayout {
+                                id: ledOnLayout
+                                visible: ledOn.checked
+                                spacing: 10
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Brightness"
+                                }
+
+                                Slider {
+                                    id: ledBrightness
+                                    from: 0.0
+                                    to: 1.0
+                                    value: 0.6
+                                    onValueChanged: {
+                                        handleDebouncedChange()
+                                    }
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Idle Brightness"
+                                }
+
+                                Slider {
+                                    id: ledBrightnessIdle
+                                    from: 0.0
+                                    to: 1.0
+                                    value: 0.3
+                                    onValueChanged: {
+                                        handleDebouncedChange()
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    id: ledStatusBrightnessLayout
+                                    visible: ledStatusStripType.currentValue > 0
+                                    spacing: 10
+
+                                    Text {
+                                        color: Utility.getAppHexColor("lightText")
+                                        text: "Status Brightness"
+                                    }
+
+                                    Slider {
+                                        id: ledBrightnessStatus
+                                        from: 0.0
+                                        to: 1.0
+                                        value: 0.6
+                                        onValueChanged: {
+                                            handleDebouncedChange()
+                                        }
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                id: ledHighBeamBrightnessLayout
+                                visible: (
+                                    ledOn.checked
+                                    && ledHighbeamOn.checked
+                                    && (
+                                        ledFrontStripType.currentIndex === 7
+                                        || ledRearStripType.currentIndex === 7
+                                    )
+                                )
+                                spacing: 10
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Highbeam Brightness"
+                                }
+
+                                Slider {
+                                    id: ledBrightnessHighbeam
+                                    from: 0.0
+                                    to: 1.0
+                                    value: 0.5
+                                    onValueChanged: {
+                                        handleDebouncedChange()
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    Text {
-                        color: Utility.getAppHexColor("lightText")
-                        text: "Idle Brightness"
-                    }
+                    GroupBox {
+                        title: "BMS Control"
+                        Layout.fillWidth: true
+                        visible: bmsEnabled.checked && bmsType.currentIndex > 1
 
-                    Slider {
-                        id: ledBrightnessIdle
-                        from: 0.0
-                        to: 1.0
-                        value: 0.3
-                        onValueChanged: {
-                            handleDebouncedChange()
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
+
+                            Switch {
+                                id: bmsChargeState
+                                text: "Charge BMS 90%"
+                                checked: true
+                                enabled: bmsConnected === 1
+                                onCheckedChanged: {
+                                    handleDebouncedChange()
+                                }
+                            }
                         }
                     }
 
-                    ColumnLayout {
-                        id: ledStatusBrightnessLayout
-                        visible: ledStatusStripType.currentValue > 0
-                        spacing: 10
+                    GroupBox {
+                        title: "Status"
+                        Layout.fillWidth: true
 
-                        Text {
-                            color: Utility.getAppHexColor("lightText")
-                            text: "Status Brightness"
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
+
+                            // Status Texts Column
+                            Text {
+                                id: lastStatusText
+                                Layout.fillWidth: true
+                                color: statusTimeout ? "red" : Utility.getAppHexColor("lightText")
+                                text: "Last Lisp Update: " + lastStatusTime + "s ago"
+                            }
+
+                            Text {
+                                id: floatPackageStatus
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "Float Package Status: Unknown"
+                            }
+
+                            Text {
+                                id: pubmoteStatus
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "Pubmote Status: Unknown"
+                            }
+
+                            Text {
+                                id: bmsStatus
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "BMS Status: Unknown"
+                            }
                         }
+                    }
 
-                        Slider {
-                            id: ledBrightnessStatus
-                            from: 0.0
-                            to: 1.0
-                            value: 0.6
-                            onValueChanged: {
-                                handleDebouncedChange()
+                    GroupBox {
+                        title: "BMS Info"
+                        Layout.fillWidth: true
+                        visible: bmsEnabled.checked && bmsConnected === 1
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
+
+                            Text {
+                                id: bmsError
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "BMS Error: None"
+                            }
+                            Text {
+                                id: bmsBatteryType
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "Battery Type: None"
+                            }
+                            Text {
+                                id: bmsBatteryCycles
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "Battery Cycles: None"
                             }
                         }
                     }
                 }
-
-                ColumnLayout {
-                    id: ledHighBeamBrightnessLayout
-                    visible: ledOn.checked && ledHighbeamOn.checked && (ledFrontStripType.currentIndex === 7 || ledRearStripType.currentIndex === 7)
-                    spacing: 10
-                    Text {
-                        color: Utility.getAppHexColor("lightText")
-                        text: "Highbeam Brightness"
-                    }
-                    Slider {
-                        id: ledBrightnessHighbeam
-                        from: 0.0
-                        to: 1.0
-                        value: 0.5
-                        onValueChanged: {
-                            handleDebouncedChange()
-                        }
-                    }
-                }
-            }
-        }
-
-        GroupBox {
-            title: "BMS Control"
-            Layout.fillWidth: true
-            visible: bmsEnabled.checked && bmsType.currentIndex > 1
-
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 10
-                Switch {
-                    id: bmsChargeState
-                    text: "Charge BMS 90%"
-                    checked: true
-                    enabled: bmsConnected === 1
-                    onCheckedChanged: {
-                        handleDebouncedChange()
-                    }
-                }
             }
 
-        }
-        GroupBox {
-            title: "Status"
-            Layout.fillWidth: true
-
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 10
-                // Status Texts Column
-                    Text {
-                        id: lastStatusText
-                        Layout.fillWidth: true
-                        color: statusTimeout ? "red" : Utility.getAppHexColor("lightText")
-                        text: "Last Lisp Update: " + lastStatusTime + "s ago"
-                    }
-                    Text {
-                        id: floatPackageStatus
-                        Layout.fillWidth: true
-                        color: Utility.getAppHexColor("lightText")
-                        text: "Float Package Status: Unknown"
-                    }
-
-                    Text {
-                        id: pubmoteStatus
-                        Layout.fillWidth: true
-                        color: Utility.getAppHexColor("lightText")
-                        text: "Pubmote Status: Unknown"
-                    }
-
-                    Text {
-                        id: wifiStatus
-                        Layout.fillWidth: true
-                        color: Utility.getAppHexColor("lightText")
-                        text: "WiFi Channel: Unknown"
-                    }
-
-                    Text {
-                        id: bmsStatus
-                        Layout.fillWidth: true
-                        color: Utility.getAppHexColor("lightText")
-                        text: "BMS Status: Unknown"
-                    }
-                }
-}
-        GroupBox {
-            title: "BMS Info"
-            Layout.fillWidth: true
-            visible: bmsEnabled.checked && bmsConnected === 1
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 10
-                    Text {
-                        id: bmsError
-                        Layout.fillWidth: true
-                        color: Utility.getAppHexColor("lightText")
-                        text: "BMS Error: None"
-                    }
-                    Text {
-                        id: bmsBatteryType
-                        Layout.fillWidth: true
-                        color: Utility.getAppHexColor("lightText")
-                        text: "Battery Type: None"
-                    }
-                    Text {
-                        id: bmsBatteryCycles
-                        Layout.fillWidth: true
-                        color: Utility.getAppHexColor("lightText")
-                        text: "Battery Cycles: None"
-                    }
-                }
-}
-    }
-}
-           // LED Configuration Tab
+            // LED Configuration Tab
             ScrollView {
                 clip: true
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
-                    ColumnLayout {
+
+                ColumnLayout {
                     width: stackLayout.width
                     spacing: 10
-                                ColumnLayout {
-                                    id: ledEnabledLayout
-                                    visible: ledEnabled.checked && tabBar2.currentIndex === 0
-                                    spacing: 10
-                    GroupBox {
-                        title: "LED General Config"
-                        Layout.fillWidth: true
+
+                    ColumnLayout {
+                        id: ledEnabledLayout
+                        visible: ledEnabled.checked && tabBar2.currentIndex === 0
+                        spacing: 10
+
+                        GroupBox {
+                            title: "LED General Config"
+                            Layout.fillWidth: true
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "Max Blend Count"
-}
 
-SpinBox {
-    id: ledMaxBlendCount
-    from: 1
-    to: 100
-    value: 4
-    editable: true
-}
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Max Blend Count"
+                                }
 
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "LED Fix"
-}
+                                SpinBox {
+                                    id: ledMaxBlendCount
+                                    from: 1
+                                    to: 100
+                                    value: 4
+                                    editable: true
+                                }
 
-SpinBox {
-    id: ledFix
-    from: 1
-    to: 1000000
-    value: 100
-    editable: true
-}
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "LED Fix"
+                                }
 
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "LED Max Brightness (80% by default to prevent LED burnout)"
-}
+                                SpinBox {
+                                    id: ledFix
+                                    from: 1
+                                    to: 1000000
+                                    value: 100
+                                    editable: true
+                                }
 
-Slider {
-    id: ledMaxBrightness
-    from: 0.0
-    to: 1.0
-    value: 0.8
-    stepSize: 0.01
-    }
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "LED Max Brightness (80% by default to prevent LED burnout)"
+                                }
 
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "Dim RGB on Highbeam (% of main brightness)"
-}
+                                Slider {
+                                    id: ledMaxBrightness
+                                    from: 0.0
+                                    to: 1.0
+                                    value: 0.8
+                                    stepSize: 0.01
+                                    }
 
-Slider {
-    id: ledDimOnHighbeamRatio
-    from: 0.0
-    to: 1.0
-    value: 0.0
-    stepSize: 0.1
-}
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Dim RGB on Highbeam (% of main brightness)"
+                                }
+
+                                Slider {
+                                    id: ledDimOnHighbeamRatio
+                                    from: 0.0
+                                    to: 1.0
+                                    value: 0.0
+                                    stepSize: 0.1
+                                }
+
                                 Text {
                                     color: Utility.getAppHexColor("lightText")
                                     text: "Mode"
@@ -748,6 +812,7 @@ Slider {
                                     color: Utility.getAppHexColor("lightText")
                                     text: "Footpad Mode"
                                 }
+
                                 ComboBox {
                                     id: ledModeFootpad
                                     Layout.fillWidth: true
@@ -762,7 +827,6 @@ Slider {
                                     property int value: 0
                                 }
 
-
                                 CheckBox {
                                     id: ledMallGrabEnabled
                                     text: "Mall Grab"
@@ -774,11 +838,13 @@ Slider {
                                     text: "Brake Light"
                                     checked: true
                                 }
+
                                 CheckBox {
                                     id: ledShowBatteryCharging
                                     text: "Show battery % while charging"
                                     checked: false
                                 }
+                                
                                 ColumnLayout {
                                     id: ledBrakeLightLayout
                                     visible: ledBrakeLightEnabled.checked
@@ -823,18 +889,19 @@ Slider {
                                     value: 600
                                     editable: true
                                 }
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "Startup Timeout (s)"
-}
 
-SpinBox {
-    id: ledStartupTimeout
-    from: 10
-    to: 60
-    value: 20
-    editable: true
-}
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Startup Timeout (s)"
+                                }
+
+                                SpinBox {
+                                    id: ledStartupTimeout
+                                    from: 10
+                                    to: 60
+                                    value: 20
+                                    editable: true
+                                }
                             }
                         }
 
@@ -1116,6 +1183,7 @@ SpinBox {
                                         editable: true
                                     }
                                 }
+
                                 ColumnLayout {
                                     id: ledRearHighbeamPinLayout
                                     visible: ledRearStripType.currentValue === 7
@@ -1134,6 +1202,7 @@ SpinBox {
                                         editable: true
                                     }
                                 }
+
                                 ColumnLayout {
                                     id: ledRearCustomSettings
                                     visible: ledRearStripType.currentValue === 1
@@ -1241,10 +1310,10 @@ SpinBox {
                                     id: ledButtonCustomSettings
                                     visible: ledRearStripType.currentValue === 1
                                     spacing: 10
-
                                 }
                             }
                         }
+                        
                         GroupBox {
                             title: "LED Footpad Config"
                             Layout.fillWidth: true
@@ -1350,58 +1419,59 @@ SpinBox {
                         }
                     }
 
-                ColumnLayout {
-                    width: stackLayout.width
-                    spacing: 10
-                    GroupBox {
-                        title: "Pubmote Config"
-                        Layout.fillWidth: true
-
+                    ColumnLayout {
+                        width: stackLayout.width
+                        spacing: 10
+                        GroupBox {
+                            title: "Pubmote Config"
+                            Layout.fillWidth: true
                             visible: pubmoteEnabled.checked && tabBar2.currentIndex === 1
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 5
-                            RowLayout {
+
+                            ColumnLayout {
+                                anchors.fill: parent
                                 spacing: 5
-                            id: pubmoteLayout
-                                Button {
-                                    text: "Pair Pubmote"
-                                    onClicked: {
-                                        pubmotePairPopup.open();  // Open the confirmation popup with the random code
+                                RowLayout {
+                                    spacing: 5
+                                    id: pubmoteLayout
+
+                                    Button {
+                                        text: "Pair Pubmote"
+                                        onClicked: {
+                                            pubmotePairPopup.open();  // Open the confirmation popup with the random code
+                                        }
+                                    }
+
+                                    Text {
+                                        id: pubmoteMacAddress
+                                        color: Utility.getAppHexColor("lightText")
+                                        text: "Pubmote MAC: Unknown"
                                     }
                                 }
-
-                                Text {
-                                    id: pubmoteMacAddress
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Pubmote MAC: Unknown"
+                            
+                                RowLayout {
+                                    spacing: 5
+                                    id: pubmoteLayout2
+                                    visible: pubmoteEnabled.checked
                                 }
-                            }
-                            RowLayout {
-                                spacing: 5
-                            id: pubmoteLayout2
-                            visible: pubmoteEnabled.checked
                             }
                         }
                     }
-                }
-ColumnLayout {
-                    width: stackLayout.width
-                    spacing: 10
-                    GroupBox {
-                        title: "BMS Config"
-                        Layout.fillWidth: true
-                        visible: bmsEnabled.checked && tabBar2.currentIndex === 2
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 10
+                    
+                    ColumnLayout {
+                        width: stackLayout.width
+                        spacing: 10
+                        GroupBox {
+                            title: "BMS Config"
+                            Layout.fillWidth: true
+                            visible: bmsEnabled.checked && tabBar2.currentIndex === 2
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 10
 
-
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "BMS Type"
-}
-
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "BMS Type"
+                                }
 
                                 ComboBox {
                                     id: bmsType
@@ -1423,264 +1493,287 @@ Text {
                                     id: bmsSettings
                                     visible: bmsType.currentIndex > 0
                                     spacing: 10
-                                ColumnLayout {
-                                    id: bmsCryptoSettingsLayout
-                                    visible: bmsType.currentIndex > 1
-                                    spacing: 10
-                            Button {
-                            text: "Set Keys"
-                            onClicked: {
-                            keyInput.text = ""
-                            counterInput.text = ""
-                            keySettingPopup.open()
+
+                                    ColumnLayout {
+                                        id: bmsCryptoSettingsLayout
+                                        visible: bmsType.currentIndex > 1
+                                        spacing: 10
+
+                                        Button {
+                                            text: "Set Keys"
+                                            onClicked: {
+                                                keyInput.text = ""
+                                                counterInput.text = ""
+                                                keySettingPopup.open()
+                                            }
+                                        }
+                                    }
+                                    
+                                    CheckBox {
+                                        id: bmsRS485Chip
+                                        text: "RS485 Chip (Required to set charger level on encrypted bms. Else use OWIE RS485 uart hack)"
+                                        checked: false
+                                    }
+                            
+                                    Text {
+                                        color: Utility.getAppHexColor("lightText")
+                                        text: "RS485 RO/A Pin"
+                                    }
+
+                                    SpinBox {
+                                        id: bmsRs485ROPin
+                                        from: -1
+                                        to: 100
+                                        value: -1
+                                        editable: true
+                                    }
+
+                                    ColumnLayout {
+                                        id: bmsRS485chipLayout
+                                        visible: bmsRS485Chip.checked
+                                        spacing: 10
+
+                                        Text {
+                                            color: Utility.getAppHexColor("lightText")
+                                            text: "RS485 DI Pin"
+                                        }
+
+                                        SpinBox {
+                                            id: bmsRs485DIPin
+                                            from: -1
+                                            to: 100
+                                            value: -1
+                                            editable: true
+                                        }
+
+                                        Text {
+                                            color: Utility.getAppHexColor("lightText")
+                                            text: "RS485 DE/RE Pin"
+                                        }
+
+                                        SpinBox {
+                                            id: bmsRs485DEREPin
+                                            from: -1
+                                            to: 100
+                                            value: -1
+                                            editable: true
+                                        }
+                                        
+                                        Button {
+                                            text: "Factory Init"
+                                            //enabled: bmsConnected === 1
+                                            onClicked: {
+                                                bmsFactoryInit()
+                                            }
+                                        }
+                                    }
+
+                                    CheckBox {
+                                        id: bmsChargeOnly
+                                        text: "Charge only (Mosfet toggle wakeup to keep alive)"
+                                        checked: false
+                                    }
+
+                                    ColumnLayout {
+                                        id: bmsChargeOnlyLayout
+                                        visible: bmsChargeOnly.checked
+                                        spacing: 10
+
+                                        Text {
+                                            color: Utility.getAppHexColor("lightText")
+                                            text: "Wakeup Pin"
+                                        }
+
+                                        SpinBox {
+                                            id: bmsWakeupPin
+                                            from: -1
+                                            to: 100
+                                            value: -1
+                                            editable: true
+                                        }
+                                    }
+
+                                    CheckBox {
+                                        id: bmsOverrideSOC
+                                        text: "Override SOC (Voltage)"
+                                        checked: false
+                                    }
+
+                                    Text {
+                                        color: Utility.getAppHexColor("lightText")
+                                        text: "BMS Buffer Size"
+                                    }
+
+                                    SpinBox {
+                                        id: bmsBuffSize
+                                        from: 16
+                                        to: 256
+                                        value: 128
+                                        editable: true
+                                    }
+                                }
                             }
-                            }
-                            }
+                        }
+                    }
+                }
+            }
+
+            // Settings tab
+            ScrollView {
+                clip: true
+                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                ColumnLayout {
+                    width: stackLayout.width
+                    spacing: 10
+
+                    GroupBox {
+                        title: "Features"
+                        Layout.fillWidth: true
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
                             CheckBox {
-                                id: bmsRS485Chip
-                                text: "RS485 Chip (Required to set charger level on encrypted bms. Else use OWIE RS485 uart hack)"
-                                checked: false
-                            }
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "RS485 RO/A Pin"
-                            }
-
-                            SpinBox {
-                                id: bmsRs485ROPin
-                                from: -1
-                                to: 100
-                                value: -1
-                                editable: true
-                            }
-                                ColumnLayout {
-                                    id: bmsRS485chipLayout
-                                    visible: bmsRS485Chip.checked
-                                    spacing: 10
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "RS485 DI Pin"
-                            }
-
-                            SpinBox {
-                                id: bmsRs485DIPin
-                                from: -1
-                                to: 100
-                                value: -1
-                                editable: true
-                            }
-
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "RS485 DE/RE Pin"
-                            }
-
-                            SpinBox {
-                                id: bmsRs485DEREPin
-                                from: -1
-                                to: 100
-                                value: -1
-                                editable: true
-                            }
-                            Button {
-                            text: "Factory Init"
-                            //enabled: bmsConnected === 1
-                            onClicked: {
-                            bmsFactoryInit()
-                            }
-                            }
-                            }
-                            CheckBox {
-                                id: bmsChargeOnly
-                                text: "Charge only (Mosfet toggle wakeup to keep alive)"
-                                checked: false
-                            }
-                                ColumnLayout {
-                                    id: bmsChargeOnlyLayout
-                                    visible: bmsChargeOnly.checked
-                                    spacing: 10
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "Wakeup Pin"
-                            }
-
-                            SpinBox {
-                                id: bmsWakeupPin
-                                from: -1
-                                to: 100
-                                value: -1
-                                editable: true
-                            }
+                                id: ledEnabled
+                                text: "LED Enabled"
+                                checked: true
                             }
 
                             CheckBox {
-                                id: bmsOverrideSOC
-                                text: "Override SOC (Voltage)"
+                                id: pubmoteEnabled
+                                text: "Pubmote Enabled"
                                 checked: false
+                                enabled: true
                             }
 
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "BMS Buffer Size"
-                            }
-                            SpinBox {
-                                id: bmsBuffSize
-                                from: 16
-                                to: 256
-                                value: 128
-                                editable: true
-                            }
+                            CheckBox {
+                                id: bmsEnabled
+                                text: "BMS Enabled"
+                                checked: false
+                                enabled: true
                             }
                         }
                     }
 
-            }
-}
-                }
+                    GroupBox {
+                        title: "Loop Settings"
+                        Layout.fillWidth: true
 
-//Settings tab
+                        ColumnLayout {
+                            width: stackLayout.width
+                            spacing: 10
+
+                            Text {
+                                color: Utility.getAppHexColor("lightText")
+                                text: "CAN Delay (hz)"
+                            }
+
+                            SpinBox {
+                                id: canLoopDelay
+                                from: 1
+                                to: 1000
+                                value: 8
+                                stepSize: 1
+                                editable: true
+                            }
+
+                            Text {
+                                color: Utility.getAppHexColor("lightText")
+                                text: "LED Delay (hz) "
+                                visible: ledEnabled.checked
+                            }
+
+                            SpinBox {
+                                id: ledLoopDelay
+                                from: 1
+                                to: 1000
+                                value: 20
+                                stepSize: 1
+                                visible: ledEnabled.checked
+                                editable: true
+                            }
+
+                            Text {
+                                color: Utility.getAppHexColor("lightText")
+                                text: "Pubmote Delay (hz)"
+                                visible: pubmoteEnabled.checked
+                            }
+
+                            SpinBox {
+                                id: pubmoteLoopDelay
+                                from: 1
+                                to: 1000
+                                value: 8
+                                stepSize: 1
+                                visible: pubmoteEnabled.checked
+                                editable: true
+                            }
+
+                            Text {
+                                color: Utility.getAppHexColor("lightText")
+                                text: "BMS Delay (hz): "
+                                visible: bmsEnabled.checked
+                            }
+
+                            SpinBox {
+                                id: bmsLoopDelay
+                                from: 1
+                                to: 1000
+                                value: 8
+                                stepSize: 1
+                                visible: bmsEnabled.checked
+                                editable: true
+                            }
+                        }
+                    }
+                }
+            }
+
+            // About Tab
             ScrollView {
                 clip: true
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
-                    ColumnLayout {
-                    width: stackLayout.width
-                    spacing: 10
-                        GroupBox {
-                        title: "Features"
-                        Layout.fillWidth: true
-                            ColumnLayout {
-                                anchors.fill: parent
-                                spacing: 10
-                                CheckBox {
-                                    id: ledEnabled
-                                    text: "LED Enabled"
-                                    checked: true
-                                }
-                                CheckBox {
-                                    id: pubmoteEnabled
-                                    text: "Pubmote Enabled"
-                                    checked: false
-                                    enabled: true
-                                }
-                                CheckBox {
-                                    id: bmsEnabled
-                                    text: "BMS Enabled"
-                                    checked: false
-                                    enabled: true
-                                }
-                                }
-                                }
-                        GroupBox {
-                        title: "Loop Settings"
-                        Layout.fillWidth: true
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
                 ColumnLayout {
                     width: stackLayout.width
-                    spacing: 10
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "CAN Delay (hz)"
-}
-SpinBox {
-    id: canLoopDelay
-    from: 1
-    to: 1000
-    value: 8
-    stepSize: 1
-    editable: true
-}
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "LED Delay (hz) "
-    visible: ledEnabled.checked
-}
-SpinBox {
-    id: ledLoopDelay
-    from: 1
-    to: 1000
-    value: 20
-    stepSize: 1
-    visible: ledEnabled.checked
-    editable: true
-}
+                    spacing: 20
 
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "Pubmote Delay (hz)"
-    visible: pubmoteEnabled.checked
-}
+                    TextArea {
+                        id: aboutText
+                        textFormat: Text.RichText
+                        text: "<p><b>FLOAT ACCESSORIES PACKAGE</b></p>" +
+                            "<p>A VESC Express package for controlling LEDs, BMS and Pubmote.</p>" +
 
-SpinBox {
-    id: pubmoteLoopDelay
-    from: 1
-    to: 1000
-    value: 8
-    stepSize: 1
-    visible: pubmoteEnabled.checked
-    editable: true
-}
-Text {
-    color: Utility.getAppHexColor("lightText")
-    text: "BMS Delay (hz): "
-    visible: bmsEnabled.checked
-}
+                            "<p><b>Support Future Work</b></p>" +
+                            "<p>Buy me a Coffee: <a href='https://venmo.com/sylerclayton'>https://venmo.com/sylerclayton</a></p>" +
+                            "<p>Support me on Patreon: <a href='https://patreon.com/SylerTheCreator'>https://patreon.com/SylerTheCreator</a></p>" +
 
-SpinBox {
-    id: bmsLoopDelay
-    from: 1
-    to: 1000
-    value: 8
-    stepSize: 1
-    visible: bmsEnabled.checked
-    editable: true
-}
+                            "<p><b>CREDITS</b></p>" +
+                            "<p>Special Thanks: Benjamin Vedder, surfdado, Mitch (NuRxG), Siwoz, lolwheel (OWIE), ThankTheMaker (rESCue), 4_fools (avaspark), auden_builds (pubmote)</p>" +
+                            "<p>gr33tz: outlandnish, exphat, datboig42069</p>" +
+                            "<p>Beta Testers: Koddex, Pickles</p>" +
 
-}
-}
-}
-}
+                            "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
 
-// About Tab
-        ScrollView {
-            clip: true
-            ScrollBar.vertical.policy: ScrollBar.AsNeeded
-            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                            "<p><b>RELEASE NOTES</b></p>" +
+                            "<p>Now with BMS and Pubmote (beta)</p>" +
 
-            ColumnLayout {
-                width: stackLayout.width
-                spacing: 20
-TextArea {
-    id: aboutText
-    textFormat: Text.RichText
-    text: "<p><b>FLOAT ACCESSORIES PACKAGE</b></p>" +
-          "<p>A VESC Express package for controlling LEDs, BMS and Pubmote.</p>" +
-
-          "<p><b>Support Future Work</b></p>" +
-          "<p>Buy me a Coffee: <a href='https://venmo.com/sylerclayton'>https://venmo.com/sylerclayton</a></p>" +
-          "<p>Support me on Patreon: <a href='https://patreon.com/SylerTheCreator'>https://patreon.com/SylerTheCreator</a></p>" +
-
-          "<p><b>CREDITS</b></p>" +
-          "<p>Special Thanks: Benjamin Vedder, surfdado, Mitch (NuRxG), Siwoz, lolwheel (OWIE), ThankTheMaker (rESCue), 4_fools (avaspark), auden_builds (pubmote)</p>" +
-          "<p>gr33tz: outlandnish, exphat, datboig42069</p>" +
-          "<p>Beta Testers: Koddex, Pickles</p>" +
-
-          "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
-
-          "<p><b>RELEASE NOTES</b></p>" +
-          "<p>Now with BMS and Pubmote (beta)</p>" +
-
-          "<p><b>BUILD INFO</b></p>" +
-		  "<p>Version 2.5</p>" +
-          "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
-    Layout.fillWidth: true
-    wrapMode: Text.WordWrap
-    color: Utility.getAppHexColor("lightText")
-    onLinkActivated: function(url) {
-        Qt.openUrlExternally(url)
-    }
-}
-}
+                            "<p><b>BUILD INFO</b></p>" +
+                            "<p>Version 2.5</p>" +
+                            "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        color: Utility.getAppHexColor("lightText")
+                        onLinkActivated: function(url) {
+                            Qt.openUrlExternally(url)
+                        }
+                    }
+                }
+            }
         }
-    }
+        
         // Save and Restore Buttons
         RowLayout {
             Layout.fillWidth: true
@@ -1692,12 +1785,14 @@ TextArea {
                     sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)")
                 }
             }
+
             Button {
                 text: "Save Cfg"
                 onClicked: {
-                if (bmsEnabled.checked && !acceptTOS) {
-                    termsPopup.visible = true
-                }
+                    if (bmsEnabled.checked && !acceptTOS) {
+                        termsPopup.visible = true
+                    }
+
                     //console.log(makeArgStr())
                     sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(recv-config " + makeArgStr() + " )")
                     sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(save-config)")
@@ -1827,17 +1922,17 @@ TextArea {
         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(bms-trigger-factory-init)")
     }
 
-function makeControlArgStr() {
-    return [
-        ledOn.checked * 1,
-        ledHighbeamOn.checked * 1,
-        parseFloat(ledBrightness.value).toFixed(2),
-        parseFloat(ledBrightnessHighbeam.value).toFixed(2),
-        parseFloat(ledBrightnessIdle.value).toFixed(2),
-        parseFloat(ledBrightnessStatus.value).toFixed(2),
-        bmsChargeState.checked * 1
-    ].join(" ");
-}
+    function makeControlArgStr() {
+        return [
+            ledOn.checked * 1,
+            ledHighbeamOn.checked * 1,
+            parseFloat(ledBrightness.value).toFixed(2),
+            parseFloat(ledBrightnessHighbeam.value).toFixed(2),
+            parseFloat(ledBrightnessIdle.value).toFixed(2),
+            parseFloat(ledBrightnessStatus.value).toFixed(2),
+            bmsChargeState.checked * 1
+        ].join(" ");
+    }
 
     function handleDebouncedChange() {
         debounceTimer.restart()  // Reset the timer on any change
@@ -1847,74 +1942,74 @@ function makeControlArgStr() {
         //console.log("Applying LED control settings after debounce")
         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(recv-control " + makeControlArgStr() + " )")
     }
-function makeArgStr() {
-    return [
-        ledEnabled.checked * 1,
-        bmsEnabled.checked * 1,
-        pubmoteEnabled.checked * 1,
-        ledOn.checked * 1,
-        ledHighbeamOn.checked * 1,
-        ledMode.currentIndex,
-        ledModeIdle.currentIndex,
-        ledModeStatus.currentIndex,
-        ledModeStartup.currentIndex,
-        ledModeButton.currentIndex,
-        ledModeFootpad.currentIndex,
-        ledMallGrabEnabled.checked * 1,
-        ledBrakeLightEnabled.checked * 1,
-        parseFloat(ledBrakeLightMinAmps.value).toFixed(2),
-        idleTimeout.value,
-        idleTimeoutShutoff.value,
-        parseFloat(ledBrightness.value).toFixed(2),
-        parseFloat(ledBrightnessHighbeam.value).toFixed(2),
-        parseFloat(ledBrightnessIdle.value).toFixed(2),
-        parseFloat(ledBrightnessStatus.value).toFixed(2),
-        ledStatusPin.value,
-        ledStatusNum.value,
-        ledStatusType.currentIndex,
-        ledStatusReversed.checked * 1,
-        ledFrontPin.value,
-        ledFrontNum.value,
-        ledFrontType.currentIndex,
-        ledFrontReversed.checked * 1,
-        ledFrontStripType.currentIndex,
-        ledRearPin.value,
-        ledRearNum.value,
-        ledRearType.currentIndex,
-        ledRearReversed.checked * 1,
-        ledRearStripType.currentIndex,
-        ledButtonPin.value,
-        ledButtonStripType.currentIndex,
-        ledFootpadPin.value,
-        ledFootpadNum.value,
-        ledFootpadType.currentIndex,
-        ledFootpadReversed.checked * 1,
-        ledFootpadStripType.currentIndex,
-        bmsRs485DIPin.value,
-        bmsRs485ROPin.value,
-        bmsRs485DEREPin.value,
-        bmsWakeupPin.value,
-        bmsOverrideSOC.checked * 1,
-        bmsRS485Chip.checked * 1,
-        ledLoopDelay.value,
-        bmsLoopDelay.value,
-        pubmoteLoopDelay.value,
-        canLoopDelay.value,
-        ledMaxBlendCount.value,
-        ledStartupTimeout.value,
-        parseFloat(ledDimOnHighbeamRatio.value).toFixed(2),
-        bmsType.currentIndex,
-        ledStatusStripType.currentIndex,
-        bmsChargeOnly.checked * 1,
-        ledFix.value,
-        ledShowBatteryCharging.checked * 1,
-        ledFrontHighbeamPin.value,
-        ledRearHighbeamPin.value,
-        bmsBuffSize.value,
-        parseFloat(ledMaxBrightness.value).toFixed(2)
-
-    ].join(" ");
-}
+        
+    function makeArgStr() {
+        return [
+            ledEnabled.checked * 1,
+            bmsEnabled.checked * 1,
+            pubmoteEnabled.checked * 1,
+            ledOn.checked * 1,
+            ledHighbeamOn.checked * 1,
+            ledMode.currentIndex,
+            ledModeIdle.currentIndex,
+            ledModeStatus.currentIndex,
+            ledModeStartup.currentIndex,
+            ledModeButton.currentIndex,
+            ledModeFootpad.currentIndex,
+            ledMallGrabEnabled.checked * 1,
+            ledBrakeLightEnabled.checked * 1,
+            parseFloat(ledBrakeLightMinAmps.value).toFixed(2),
+            idleTimeout.value,
+            idleTimeoutShutoff.value,
+            parseFloat(ledBrightness.value).toFixed(2),
+            parseFloat(ledBrightnessHighbeam.value).toFixed(2),
+            parseFloat(ledBrightnessIdle.value).toFixed(2),
+            parseFloat(ledBrightnessStatus.value).toFixed(2),
+            ledStatusPin.value,
+            ledStatusNum.value,
+            ledStatusType.currentIndex,
+            ledStatusReversed.checked * 1,
+            ledFrontPin.value,
+            ledFrontNum.value,
+            ledFrontType.currentIndex,
+            ledFrontReversed.checked * 1,
+            ledFrontStripType.currentIndex,
+            ledRearPin.value,
+            ledRearNum.value,
+            ledRearType.currentIndex,
+            ledRearReversed.checked * 1,
+            ledRearStripType.currentIndex,
+            ledButtonPin.value,
+            ledButtonStripType.currentIndex,
+            ledFootpadPin.value,
+            ledFootpadNum.value,
+            ledFootpadType.currentIndex,
+            ledFootpadReversed.checked * 1,
+            ledFootpadStripType.currentIndex,
+            bmsRs485DIPin.value,
+            bmsRs485ROPin.value,
+            bmsRs485DEREPin.value,
+            bmsWakeupPin.value,
+            bmsOverrideSOC.checked * 1,
+            bmsRS485Chip.checked * 1,
+            ledLoopDelay.value,
+            bmsLoopDelay.value,
+            pubmoteLoopDelay.value,
+            canLoopDelay.value,
+            ledMaxBlendCount.value,
+            ledStartupTimeout.value,
+            parseFloat(ledDimOnHighbeamRatio.value).toFixed(2),
+            bmsType.currentIndex,
+            ledStatusStripType.currentIndex,
+            bmsChargeOnly.checked * 1,
+            ledFix.value,
+            ledShowBatteryCharging.checked * 1,
+            ledFrontHighbeamPin.value,
+            ledRearHighbeamPin.value,
+            bmsBuffSize.value,
+            parseFloat(ledMaxBrightness.value).toFixed(2)
+        ].join(" ");
+    }
 
     // Property to track enabled tabs
     property var enabledIndices: []
@@ -1960,6 +2055,7 @@ function makeArgStr() {
             packedValue & 0xFF
         ];
     }
+
     Connections {
         target: mCommands
 
@@ -2054,13 +2150,23 @@ function makeArgStr() {
                 VescIf.emitMessageDialog("Float Accessories", msg, false, false)
             } else if (str.startsWith("float-stats")) {
                 var tokens = str.split(" ")
-                // Update Float Package Connection Status
+
+                // Float Package connection status
                 var floatPackageConnected = Number(tokens[1])
                 floatPackageStatus.text = "Float Package Status: " + (floatPackageConnected ? "Connected" : "Not Connected")
                 floatPackageStatus.color = floatPackageConnected ? "green" : "red"
+                
+                // Pubmote connection status
                 var pubmoteConnected = Number(tokens[2])
-                pubmoteStatus.text = "Pubmote Status: " + (pubmoteConnected ? "Connected" : "Not Connected")
+                var wifiChannel = Number(tokens[7])
+                pubmoteStatus.text = "Pubmote Status: " + (
+                    pubmoteConnected
+                        ? "Connected on WiFi Channel " + (wifiChannel ? wifiChannel : "?")
+                        : "Not Connected / WiFi Channel " + (wifiChannel ? wifiChannel : "?")
+                )
                 pubmoteStatus.color = pubmoteConnected ? "green" : "red"
+
+                // BMS connection status
                 bmsConnected = Number(tokens[3])
                 bmsStatus.text = "BMS Status: " + (bmsConnected ? "Connected" : "Not Connected")
                 bmsStatus.color = bmsConnected ? "green" : "red"
@@ -2068,10 +2174,10 @@ function makeArgStr() {
                 bmsError.text = "BMS Error: " + bmsStatusTemp + "\nCharging: " + ((bmsStatusTemp & 0x20)>0) + "\nEmpty: " + ((bmsStatusTemp & 0x04)>0) + "\nTemp: " + ((bmsStatusTemp & 0x03)>0) + "\nOvercharge: " + ((bmsStatusTemp & 0x08)>0) + "\nSoC Calibration: " + ((bmsStatusTemp & 0x40)>0)
                 bmsBatteryType.text = "Battery Type: " + Number(tokens[5])
                 bmsBatteryCycles.text = "Battery Cycles: " + Number(tokens[6])
+
+                // Update status flags
                 lastStatusTime = 0  // Reset the timer when status is received
                 statusTimeout = false
-                var wifiChannel = Number(tokens[7])
-                wifiStatus.text = "WiFi Status: " + (wifiChannel ? wifiChannel : "Not Connected")
             } else if (str.startsWith("control")) {
                 var tokens = str.split(" ")
                 ledOn.checked = Number(tokens[1])
@@ -2085,7 +2191,7 @@ function makeArgStr() {
                 sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-control)")
                 var msg = str.substring(7)
                 VescIf.emitStatusMessage(msg, true)
-            } else if (str.startsWith("status")){
+            } else if (str.startsWith("status")) {
                 var msg = str.substring(7)
                 VescIf.emitStatusMessage(msg, true)
             }

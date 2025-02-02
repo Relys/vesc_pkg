@@ -1511,7 +1511,7 @@ Item {
                                     
                                     CheckBox {
                                         id: bmsRS485Chip
-                                        text: "RS485 Chip (Required to set charger level on encrypted bms. Else use OWIE RS485 uart hack)"
+                                        text: "RS485 Chip (Required for encrypted BMS charger level without Owie RS485 bypass)"
                                         checked: false
                                     }
                             

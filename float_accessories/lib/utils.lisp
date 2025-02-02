@@ -13,10 +13,19 @@
 
 ;(reboot)
 
-(defun max (a b) (if (> a b) a b))
-(defun min (a b) (if (< a b) a b))
+(defun max (a b)
+    (if (> a b) a b)
+)
 
-(defun print-hex (data) (print (map (fn (x) (bufget-u8 data x)) (range (buflen data)))))
+(defun min (a b)
+    (if (< a b) a b)
+)
+
+(defun print-hex (data)
+    (print
+        (map (fn (x) (bufget-u8 data x)) (range (buflen data)))
+    )
+)
 
 (defun event-handler ()
     (loopwhile t
@@ -36,13 +45,16 @@
     (send-data (str-merge "status " text))
 )
 
-(defun mklist (len val) (map (fn (x) val) (range len)))
+(defun mklist (len val)
+    (map (fn (x) val) (range len))
+)
 
 (defun split-list (lst n)
-  (if (eq lst nil)
-      nil
-      (cons (take lst n)
-            (split-list (drop lst n) n))))
+    (if (eq lst nil)
+        nil
+        (cons (take lst n) (split-list (drop lst n) n))
+    )
+)
 
 (defunret pack-bytes-to-uint32 (byte-list) {
   (return (to-u32 (+ (shl (to-u32 (ix byte-list 0)) 24)

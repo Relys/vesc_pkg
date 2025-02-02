@@ -2161,8 +2161,8 @@ Item {
                 var wifiChannel = Number(tokens[7])
                 pubmoteStatus.text = "Pubmote Status: " + (
                     pubmoteConnected
-                        ? "Connected on WiFi Channel " + (wifiChannel ? wifiChannel : "?")
-                        : "Not Connected / WiFi Channel " + (wifiChannel ? wifiChannel : "?")
+                        ? "Connected (WiFi Channel " + (wifiChannel ? wifiChannel : "?") + ")"
+                        : "Not Connected (WiFi Channel " + (wifiChannel ? wifiChannel : "?") + ")"
                 )
                 pubmoteStatus.color = pubmoteConnected ? "green" : "red"
 

@@ -23,8 +23,10 @@ Item {
 
     Component.onCompleted: {
         if (
-            !(VescIf.getLastFwRxParams().hw.includes("Express")
-            || VescIf.getLastFwRxParams().hw.includes("Avaspark"))
+            !(
+                VescIf.getLastFwRxParams().hw.includes("Express")
+                || VescIf.getLastFwRxParams().hw.includes("Avaspark")
+            )
             || VescIf.getLastFwRxParams().hw.includes("rESCue")
         ) {
             VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express, Avaspark or rESCue board", false, false)

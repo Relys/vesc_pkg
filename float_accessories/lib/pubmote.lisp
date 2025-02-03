@@ -89,6 +89,7 @@
     (print (str-merge "Channel switching enabled. Reason: " reason))
     (setq channel-locked 0)
     (wifi-auto-reconnect true)
+    (wifi-connect (conf-get `wifi-sta-ssid) (conf-get `wifi-sta-key))
 })
 
 (defun is-station-mode () {

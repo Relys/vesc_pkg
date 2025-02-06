@@ -107,61 +107,79 @@
     (setq led-brightness-highbeam (to-float in-led-brightness-highbeam))
     (setq led-brightness-idle (to-float in-led-brightness-idle))
     (setq led-brightness-status (to-float in-led-brightness-status))
+
     (set-config 'led-on (to-i in-led-on))
     (set-config 'led-highbeam-on (to-i in-led-highbeam-on))
     (set-config 'led-brightness (to-float in-led-brightness))
     (set-config 'led-brightness-highbeam (to-float in-led-brightness-highbeam))
     (set-config 'led-brightness-idle (to-float in-led-brightness-idle))
     (set-config 'led-brightness-status (to-float in-led-brightness-status))
-    (if (and (= (get-config 'bms-enabled) 1) (> bms-type 1) (!= bms-charge-state in-bms-charge-state) ){
+
+    (if (and (= (get-config 'bms-enabled) 1) (> bms-type 1) (!= bms-charge-state in-bms-charge-state) ) {
         (setq bms-charge-state (if (= bms-charge-state 1) 1 0))
         (setq bms-user-cmd 0x64)
-   })
+    })
 })
 
-(defun bms-trigger-factory-init (){
-    (if (and (= (get-config 'bms-enabled) 1) (> bms-type 1) (= bms-rs485-chip 1) ){
+(defun bms-trigger-factory-init () {
+    (if (and (= (get-config 'bms-enabled) 1) (> bms-type 1) (= bms-rs485-chip 1) ) {
         (setq bms-user-cmd 0x0e)
     })
 })
 
-(defun send-control (){
+(defun send-control () {
     (var config-string "control ")
-    (setq config-string (str-merge config-string (str-from-n (to-i led-on) "%d ") (str-from-n (to-i led-highbeam-on) "%d ") (str-from-n led-brightness "%.2f ") (str-from-n led-brightness-highbeam "%.2f ") (str-from-n led-brightness-idle "%.2f ") (str-from-n led-brightness-status "%.2f ") (str-from-n (to-i bms-charge-state) "%d ")))
+
+    (setq config-string (
+        str-merge
+        config-string
+        (str-from-n (to-i led-on) "%d ")
+        (str-from-n (to-i led-highbeam-on) "%d ")
+        (str-from-n led-brightness "%.2f ")
+        (str-from-n led-brightness-highbeam "%.2f ")
+        (str-from-n led-brightness-idle "%.2f ")
+        (str-from-n led-brightness-status "%.2f ")
+        (str-from-n (to-i bms-charge-state) "%d ")
+    ))
+
     (send-data config-string)
 })
 
-(defun recv-config (in-led-enabled in-bms-enabled in-pubmote-enabled in-led-on in-led-highbeam-on in-led-mode in-led-mode-idle in-led-mode-status in-led-mode-startup in-led-mode-button in-led-mode-footpad in-led-mall-grab-enabled
-                    in-led-brake-light-enabled in-led-brake-light-min-amps in-idle-timeout in-idle-timeout-shutoff in-led-brightness in-led-brightness-highbeam in-led-brightness-idle in-led-brightness-status in-led-status-pin in-led-status-num
-                    in-led-status-type in-led-status-reversed in-led-front-pin in-led-front-num in-led-front-type in-led-front-reversed in-led-front-strip-type
-                    in-led-rear-pin in-led-rear-num in-led-rear-type in-led-rear-reversed in-led-rear-strip-type in-led-button-pin in-led-button-strip-type in-led-footpad-pin in-led-footpad-num in-led-footpad-type in-led-footpad-reversed
-                    in-led-footpad-strip-type in-bms-rs485-di-pin in-bms-rs485-ro-pin in-bms-rs485-dere-pin in-bms-wakeup-pin in-bms-override-soc in-bms-rs485-chip in-led-loop-delay in-bms-loop-delay in-pubmote-loop-delay in-can-loop-delay
-                    in-led-max-blend-count in-led-startup-timeout in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging in-led-front-highbeam-pin in-led-rear-highbeam-pin in-bms-buff-size in-led-max-brightness) {
-    (if (>= led-context-id 0){
-    (let ((start-time (systime))
-        (timeout-val 100000))
-    (setq led-exit-flag t)
-    (loopwhile (and led-exit-flag
-              (< (- (systime) start-time) timeout-val))
-        (yield 10000))
+(defun recv-config (in-led-enabled in-bms-enabled in-pubmote-enabled in-led-on in-led-highbeam-on in-led-mode in-led-mode-idle in-led-mode-status
+    in-led-mode-startup in-led-mode-button in-led-mode-footpad in-led-mall-grab-enabled in-led-brake-light-enabled in-led-brake-light-min-amps
+    in-idle-timeout in-idle-timeout-shutoff in-led-brightness in-led-brightness-highbeam in-led-brightness-idle in-led-brightness-status
+    in-led-status-pin in-led-status-num in-led-status-type in-led-status-reversed in-led-front-pin in-led-front-num in-led-front-type
+    in-led-front-reversed in-led-front-strip-type in-led-rear-pin in-led-rear-num in-led-rear-type in-led-rear-reversed in-led-rear-strip-type
+    in-led-button-pin in-led-button-strip-type in-led-footpad-pin in-led-footpad-num in-led-footpad-type in-led-footpad-reversed
+    in-led-footpad-strip-type in-bms-rs485-di-pin in-bms-rs485-ro-pin in-bms-rs485-dere-pin in-bms-wakeup-pin in-bms-override-soc in-bms-rs485-chip
+    in-led-loop-delay in-bms-loop-delay in-pubmote-loop-delay in-can-loop-delay in-led-max-blend-count in-led-startup-timeout
+    in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging
+    in-led-front-highbeam-pin in-led-rear-highbeam-pin in-bms-buff-size in-led-max-brightness
+) {
+    (if (>= led-context-id 0) {
+        (let
+            ((start-time (systime)) (timeout-val 100000))
+            (setq led-exit-flag t)
 
-    ; Check if we exited due to timeout
-    (if (>= (- (systime) start-time) timeout-val)
-        (setq led-exit-flag nil)))
+            (loopwhile (and led-exit-flag (< (- (systime) start-time) timeout-val)) (yield 10000))
+
+            ; Check if exited due to timeout
+            (if (>= (- (systime) start-time) timeout-val) (setq led-exit-flag nil))
+        )
     })
 
-    (if (>= bms-context-id 0){
-    (let ((start-time (systime))
-       (timeout-val 100000))
-    (setq bms-exit-flag t)
-    (loopwhile (and bms-exit-flag
-              (< (- (systime) start-time) timeout-val))
-        (yield 10000))
+    (if (>= bms-context-id 0) {
+        (let
+            ((start-time (systime)) (timeout-val 100000))
+            (setq bms-exit-flag t)
 
-    ; Check if we exited due to timeout
-    (if (>= (- (systime) start-time) timeout-val)
-        (setq bms-exit-flag nil)))
+            (loopwhile (and bms-exit-flag (< (- (systime) start-time) timeout-val)) (yield 10000))
+
+            ; Check if exited due to timeout
+            (if (>= (- (systime) start-time) timeout-val) (setq bms-exit-flag nil))
+        )
     })
+
     (atomic {
         (set-config 'led-enabled (to-i in-led-enabled))
         (set-config 'bms-enabled (to-i in-bms-enabled))
@@ -231,9 +249,9 @@
         (set-config 'led-show-battery-charging (to-i in-led-show-battery-charging))
         (set-config 'bms-buff-size (to-i in-bms-buff-size))
         (set-config 'led-max-brightness (to-float in-led-max-brightness))
+    })
 
-   })
-   (if (= in-led-enabled 1){
+    (if (= in-led-enabled 1) {
         (if (and (> in-led-front-strip-type 0) (>= in-led-front-pin 0)) {
             (if (not-eq (first (trap (rgbled-init in-led-front-pin in-led-front-type))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-front-pin")
@@ -241,6 +259,7 @@
                 (set-config 'led-front-pin (to-i in-led-front-pin))
             })
         })
+
         (if (and (> in-led-rear-strip-type 0) (>= in-led-rear-pin 0)) {
             (if (not-eq (first (trap (rgbled-init in-led-rear-pin in-led-rear-type))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-rear-pin")
@@ -248,6 +267,7 @@
                 (set-config 'led-rear-pin (to-i in-led-rear-pin))
             })
         })
+
         (if (and (> in-led-status-strip-type 0) (>= in-led-status-pin 0)) {
             (if (not-eq (first (trap (rgbled-init in-led-status-pin in-led-status-type))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-status-pin")
@@ -255,6 +275,7 @@
                 (set-config 'led-status-pin (to-i in-led-status-pin))
             })
         })
+
         (if (and (> in-led-button-strip-type 0) (>= in-led-button-pin 0)) {
             (if (not-eq (first (trap (rgbled-init in-led-button-pin 0))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-button-pin")
@@ -262,6 +283,7 @@
                 (set-config 'led-button-pin (to-i in-led-button-pin))
             })
         })
+
         (if (and (> in-led-footpad-strip-type 0) (>= in-led-footpad-pin 0)) {
             (if (not-eq (first (trap (rgbled-init in-led-footpad-pin in-led-footpad-type))) 'exit-ok) {
                 (send-msg "Invalid Pin: led-footpad-pin")
@@ -286,14 +308,16 @@
             })
         })
     })
+
     (setq led-context-id (if (= (get-config 'led-enabled) 1) (spawn led-loop) -1))
     (setq bms-context-id (if (= (get-config 'bms-enabled) 1) (spawn bms-loop) -1))
+
     (if (= in-pubmote-enabled 1) {
         (if (= pubmote-context-id -1) (setq pubmote-context-id (spawn pubmote-loop)))
     })
 })
 
-(defun send-keys (key-list counter-list){
+(defun send-keys (key-list counter-list) {
     (print "Received key: ")
     (print key-list)
     (setq key-list (split-list key-list 4))
@@ -311,7 +335,7 @@
     (save-config)
 })
 
-(defun accept-tos(){
+(defun accept-tos() {
     (atomic {
         (set-config 'accept-tos 1)
         (write-val-eeprom 'accept-tos 1)
@@ -320,42 +344,56 @@
 })
 
 (defun set-config (name value) {
-    (let ((pair (assoc eeprom-addrs name)))
+    (let
+        ((pair (assoc eeprom-addrs name)))
+
         (if pair
             (loopforeach item eeprom-addrs {
                 (if (eq (car item) name)
-                    (setcdr item (list (car (cdr item))
+                    (setcdr item (
+                        list (car (cdr item))
                         (car (cdr (cdr item)))
                         (car (cdr (cdr (cdr item))))
-                        value))
+                        value
+                    ))
                 )
             })
+
             (setq eeprom-addrs (cons (cons name (list 0 'type 0 value)) eeprom-addrs))
         )
     )
 })
 
 (defun send-config () {
-(atomic {
-  (var config-string "settings ")
-  (loopforeach setting eeprom-addrs {
-    (let ((name (first setting))
-          (type (third setting))) {
-      (var value (read-val-eeprom name))
-      (setq config-string (str-merge config-string
-        (cond
-          ((eq type 'b) (str-from-n value "%d "))
-          ((eq type 'i) (str-from-n value "%d "))
-          ((eq type 'f) (str-from-n value "%.2f ")))))
+    (atomic {
+        (var config-string "settings ")
+
+        (loopforeach setting eeprom-addrs {
+            (let
+                ((name (first setting)) (type (third setting))) {
+                    (var value (read-val-eeprom name))
+
+                    (setq config-string
+                        (str-merge config-string
+                            (cond
+                                ((eq type 'b) (str-from-n value "%d "))
+                                ((eq type 'i) (str-from-n value "%d "))
+                                ((eq type 'f) (str-from-n value "%.2f "))
+                            )
+                        )
+                    )
+                }
+            )
+        })
+
+        (send-data config-string)
+        (send-status "Settings Read!")
     })
-  })
-  (send-data config-string)
-  (send-status "Settings Read!")
-  })
 })
 
 (defunret get-config (name) {
     (var pair (assoc eeprom-addrs name))
+
     (if pair
         (return (car (cdr (cdr (cdr pair)))))
         (return nil)
@@ -363,15 +401,16 @@
 })
 
 (defun save-config () {
-(atomic {
-    (loopforeach setting eeprom-addrs {
-        (var name (first setting))
-        (if (not-eq name 'crc) {
-            (write-val-eeprom name (get-config name))
+    (atomic {
+        (loopforeach setting eeprom-addrs {
+            (var name (first setting))
+            (if (not-eq name 'crc) {
+                (write-val-eeprom name (get-config name))
+            })
         })
-    })
-    (write-val-eeprom 'crc (config-crc))
-    (send-status "Settings Saved!")
+
+        (write-val-eeprom 'crc (config-crc))
+        (send-status "Settings Saved!")
     })
 })
 
@@ -379,13 +418,16 @@
     (var i 0)
 	(var crclen (* (- (length eeprom-addrs) 1) 4))
 	(var crcbuf (bufcreate crclen))
+
 	(loopforeach setting eeprom-addrs {
-            (var name (first setting))
-            (if (not-eq name 'crc) {
-                (bufset-i32 crcbuf (* i 4) (get-config name))
-                (setq i (+ i 1))
-            })
+        (var name (first setting))
+
+        (if (not-eq name 'crc) {
+            (bufset-i32 crcbuf (* i 4) (get-config name))
+            (setq i (+ i 1))
+        })
 	})
+
     (var crc (crc16 crcbuf))
     (free crcbuf)
     (return crc)
@@ -400,43 +442,50 @@
 })
 
 (defun restore-config () {
-(atomic {
-    (loopforeach setting eeprom-addrs {
-        (var name (first setting))
-        (var default-value (if (eq name 'ver-code) config-version (ix setting 3)))
-        (write-val-eeprom name default-value)
+    (atomic {
+        (loopforeach setting eeprom-addrs {
+            (var name (first setting))
+            (var default-value (if (eq name 'ver-code) config-version (ix setting 3)))
+            (write-val-eeprom name default-value)
+        })
+
+        (load-config)
+        (send-status "Settings Restored!")
     })
-	(load-config)
-	(send-status "Settings Restored!")
-})
 })
 
 (defun print-config ()
-    (loopforeach it eeprom-addrs
-        (print (list (first it) (read-val-eeprom (first it))))
-))
+    (loopforeach it eeprom-addrs (print (list (first it) (read-val-eeprom (first it)))))
+)
 
 (defun read-val-eeprom (name)
-    (let (
-        (addr (first (assoc eeprom-addrs name)))
-        (type (second (assoc eeprom-addrs name)))
+    (let
+        (
+            (addr (first (assoc eeprom-addrs name)))
+            (type (second (assoc eeprom-addrs name)))
+        )
+        (cond
+            ((eq type 'i) (eeprom-read-i addr))
+            ((eq type 'f) (eeprom-read-f addr))
+            ((eq type 'b) (eeprom-read-i addr))
+        )
     )
-    (cond
-        ((eq type 'i) (eeprom-read-i addr))
-        ((eq type 'f) (eeprom-read-f addr))
-        ((eq type 'b) (eeprom-read-i addr))
-)))
+)
 
 (defun write-val-eeprom (name val)
-    (let (
-        (addr (first (assoc eeprom-addrs name)))
-        (type (second (assoc eeprom-addrs name)))
+    (let 
+        (
+            (addr (first (assoc eeprom-addrs name)))
+            (type (second (assoc eeprom-addrs name)))
+        )
+        (cond
+            ((eq type 'i) (eeprom-store-i addr val))
+            ((eq type 'f) (eeprom-store-f addr val))
+            ((eq type 'b) (eeprom-store-i addr val))
+        )
     )
-    (cond
-        ((eq type 'i) (eeprom-store-i addr val))
-        ((eq type 'f) (eeprom-store-f addr val))
-        ((eq type 'b) (eeprom-store-i addr val))
-)))
+)
+
 (defun status () {
     (var status-string "float-stats ")
     (setq status-string (str-merge status-string (str-from-n (if (< (secs-since can-last-activity-time) 1) 1 0) "%d ")))
@@ -445,6 +494,7 @@
     (setq status-string (str-merge status-string (str-from-n bms-status "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-type "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-cycles "%d ")))
+    (setq status-string (str-merge status-string (str-from-n (wifi-get-chan) "%d ")))
     (send-data status-string)
 })
 

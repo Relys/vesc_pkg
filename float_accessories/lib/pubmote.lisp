@@ -7,17 +7,22 @@
 (def esp-now-remote-mac '())
 (def pubmote-pairing-timer 31)
 (def uni-mac '(255 255 255 255 255 255)) ; Universal mac (all devices)
+(def channel-locked 0)
+
 (defunret init-pubmote () {
-    (if (not wifi-enabled-on-boot){
-        (send-msg "WiFi was disabled on boot. Please enable and reboot to use pubmote.")
+    ; Escape without wifi
+    (if (not wifi-enabled-on-boot) {
+        (send-msg "WiFi was disabled on boot. Please enable and reboot to use Pubmote.")
         (return false)
     })
-    ;(wifi-set-chan (wifi-get-chan))
-    (setq esp-now-remote-mac (append (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-a)) (take (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-b)) 2)));
+
+    (setq esp-now-remote-mac (append (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-a)) (take (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-b)) 2)))
+
     ; Read as bytes, convert to i so we can compare lists
-    (loopfor i 0 (< i(length esp-now-remote-mac)) (+ i 1) {
+    (loopfor i 0 (< i (length esp-now-remote-mac)) (+ i 1) {
         (setix esp-now-remote-mac i (to-i (ix esp-now-remote-mac i)))
     })
+
     (esp-now-start)
     (esp-now-del-peer esp-now-remote-mac)
     (esp-now-add-peer esp-now-remote-mac)
@@ -32,13 +37,16 @@
         (send-msg "WiFi is disabled. Please enable and reboot.")
         (return false)
     })
+
     (cond
         ((>= pairing 0) {
             (set-config 'esp-now-secret-code (to-i32 pairing))
             (setq pubmote-pairing-timer (systime))
             (setq pairing-state 1)
         })
-        ((= pairing -1) { ;paring accepted
+
+        ; Pairing accepted
+        ((= pairing -1) {
             (set-config 'esp-now-remote-mac-a (pack-bytes-to-uint32 (take esp-now-remote-mac 4)))
             (set-config 'esp-now-remote-mac-b (pack-bytes-to-uint32 (append (drop esp-now-remote-mac 4) '(0 0))))
             (write-val-eeprom 'esp-now-remote-mac-a (get-config 'esp-now-remote-mac-a))
@@ -52,7 +60,9 @@
             (free tmpbuf)
             (setq pairing-state 0)
         })
-        ((= pairing -2) { ;paring rejected
+
+        ; Pairing rejected
+        ((= pairing -2) {
             (set-config 'esp-now-remote-mac-a -1)
             (write-val-eeprom 'esp-now-remote-mac-a (get-config 'esp-now-remote-mac-a) -1)
             (write-val-eeprom 'crc (config-crc))
@@ -64,38 +74,90 @@
             (setq pairing-state 0)
         })
     )
+
     (return true)
 })
 
+(defun lock-channel (reason) {
+    (print (str-merge "Channel switching disabled. Reason: " reason))
+    (setq channel-locked (wifi-get-chan))
+    (wifi-auto-reconnect false)
+    (wifi-disconnect)
+})
+
+(defun unlock-channel (reason) {
+    (print (str-merge "Channel switching enabled. Reason: " reason))
+    (setq channel-locked 0)
+    (wifi-auto-reconnect true)
+    (wifi-connect (conf-get `wifi-sta-ssid) (conf-get `wifi-sta-key))
+})
+
+(defun is-station-mode () {
+    (eq (conf-get 'wifi-mode) 1)
+})
+
+(defun is-wifi-connected () {
+    (eq (wifi-status) 'connected)
+})
+
+(defun should-lock-channel () {
+    ; Channel is not locked
+    ; Station mode
+    ; Wifi is not connected
+    (and (eq channel-locked 0) (is-station-mode) (not (is-wifi-connected)))
+})
+
+(defun should-unlock-channel (last-activity-time) {
+    ; Channel is locked,
+    ; Remote is disconnected
+    ; More than 10 seconds since last Pubmote rx
+    (and (> channel-locked 0) (is-station-mode) (> (secs-since last-activity-time) 10))
+})
+
 (defun pubmote-loop () {
-    (if (init-pubmote){
+    (if (init-pubmote) {
         (setq pubmote-loop-delay (get-config 'pubmote-loop-delay))
         (var next-run-time (secs-since 0))
         (var loop-start-time 0)
         (var loop-end-time 0)
         (var pubmote-loop-delay-sec (/ 1.0 pubmote-loop-delay))
         (var data (bufcreate 32))
+
         (loopwhile t {
-            (if (get-config 'pubmote-enabled){
+            (if (get-config 'pubmote-enabled) {
+                (if (should-unlock-channel pubmote-last-activity-time) {
+                    (unlock-channel "Inactivity timeout")
+                })
+
                 (setq loop-start-time  (secs-since 0))
+
                 (if pubmote-exit-flag {
                     (break)
                 })
+
+                ; Timeout pairing process after 30 seconds
                 (if (and (> (secs-since pubmote-pairing-timer) 30 ) (>= pairing-state 1)) {
                     (pair-pubmote -2)
-                }) ;timeout pairing process after 30 seconds
+                })
+
                 (if (= pairing-state 1) {
+                    (if (should-lock-channel) {
+                        (lock-channel "ESP-NOW packet received")
+                    })
 
                     (var pairing-data (bufcreate 6))
                     (var local-mac (get-mac-addr))
+
                     (looprange i 0 (buflen pairing-data) {
                         (bufset-u8 pairing-data i (ix local-mac i))
                     })
-                    ;(bufset-u8 data 0 69)
-                    ;(print "sending pairing info")
+
+                    ; (bufset-u8 data 0 69)
+                    ; (print "sending pairing info")
                     (esp-now-send uni-mac pairing-data)
                     (free pairing-data)
                 })
+
                 (if (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0)) {
                     (bufset-u8 data 0 69) ; Mode
                     (bufset-u8 data 1 fault-code)
@@ -116,9 +178,9 @@
                     (bufset-i32 data 28 (get-config 'esp-now-secret-code))
                     (esp-now-send esp-now-remote-mac data)
                 })
+
                 (setq loop-end-time (secs-since 0))
                 (var actual-loop-time (- loop-end-time loop-start-time))
-
                 (var time-to-wait (- next-run-time (secs-since 0)))
 
                 (if (> time-to-wait 0) {
@@ -126,27 +188,34 @@
                 }{
                     (setq next-run-time (secs-since 0))
                 })
+
                 (setq next-run-time (+ next-run-time pubmote-loop-delay-sec))
             })
         })
+
         (free data)
         (setq pubmote-exit-flag nil)
     })
 })
 
 (defun pubmote-rx (src des data rssi) {
-    (if (get-config 'pubmote-enabled){
+    (if (get-config 'pubmote-enabled) {
+        (if (should-lock-channel) {
+            (lock-channel "ESP-NOW packet received")
+        })
+
         (if (and (= pairing-state 0) (eq esp-now-remote-mac src) (= (buflen data) 16) (= (bufget-i32 data 0 'little-endian) (get-config 'esp-now-secret-code))) {
             (atomic {
                 (setq pubmote-last-activity-time (systime))
-                ;(print (list "Received" src des data rssi))
+                ; (print (list "Received" src des data rssi))
                 (var jsy (bufget-f32 data 4 'little-endian))
                 (var jsx (bufget-f32 data 8 'little-endian))
                 (var bt-c (bufget-u8 data 12))
                 (var bt-z (bufget-u8 data 13))
                 (var is-rev (bufget-u8 data 14))
-                ;(print (list jsy jsx bt-c bt-z is-rev))
-                ;(rcode-run-noret (get-config 'can-id) `(set-remote-state ,jsy ,jsx ,bt-c ,bt-z ,is-rev))
+                ; (print (list jsy jsx bt-c bt-z is-rev))
+                ; (rcode-run-noret (get-config 'can-id) `(set-remote-state ,jsy ,jsx ,bt-c ,bt-z ,is-rev))
+                
                 (if (>= (get-config 'can-id) 0) {
                     (can-cmd (get-config 'can-id) (str-replace (to-str(list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
                 })

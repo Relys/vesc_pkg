@@ -16,7 +16,6 @@
 (def fet-temp-filtered 0)
 (def motor-temp-filtered 0)
 (def odometer -1)
-(def odometer-init -1)
 (def battery-percent-remaining 0.0)
 (def can-id -1)
 (def bms-can-id -1)
@@ -191,14 +190,12 @@
                                 (setq tot-current (/ (to-float (bufget-i16 data 28)) 10))
                                 (setq duty-cycle-now (/ (to-float (- (bufget-u8 data 32) 128)) 100))
                                 (if (and (>= mode 2) (>= (buflen data) 39)) {
-                                    ;(def distance-abs-t (bufget-f32-auto data 34))
+                                    (setq distance-abs (bufget-f32 data 34))
                                     (setq fet-temp-filtered (/ (bufget-u8 data 38) 2.0))
                                     (setq motor-temp-filtered (/ (bufget-u8 data 39) 2.0))
                                 })
                                 (if (and (>= mode 3) (>= (buflen data) 52)) {
                                     (setq odometer (bufget-u32 data 41))
-                                    (if (= odometer-init -1) (setq odometer-init odometer))
-                                    (setq distance-abs (- odometer odometer-init))
                                     (if (not refloat-battery-percent) (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 2)))
                                 })
                             })

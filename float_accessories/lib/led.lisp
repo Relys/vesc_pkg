@@ -180,10 +180,10 @@
     (var front-highbeam-leds 0)
     (var rear-highbeam-leds 0)
     (cond
-        ((or (= led-front-strip-type 2) (= led-front-strip-type 3) (= led-front-strip-type 8) (= led-front-strip-type 9)) {
+        ((or (= led-front-strip-type 2) (= led-front-strip-type 3) (= led-front-strip-type 8) (= led-front-strip-type 9) (= led-front-strip-type 10)) {
              (setq front-highbeam-leds (+ front-highbeam-leds 1))
         })
-        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3) (= led-rear-strip-type 8) (= led-rear-strip-type 9)) {
+        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3) (= led-rear-strip-type 8) (= led-rear-strip-type 9) (= led-rear-strip-type 10)) {
              (setq rear-highbeam-leds (+ rear-highbeam-leds 1))
         })
         ((or (= led-front-strip-type 4) (= led-front-strip-type 5) (= led-front-strip-type 6)) {
@@ -373,7 +373,7 @@
     })
 
     (cond
-        ((or (= led-front-strip-type 2) (= led-front-strip-type 3) (= led-front-strip-type 8) (= led-front-strip-type 9)) {
+        ((or (= led-front-strip-type 2) (= led-front-strip-type 3) (= led-front-strip-type 8) (= led-front-strip-type 9) (= led-front-strip-type 10)) {
             (if (and (<= led-dim-on-highbeam-brightness 0.0) (>= direction 0) (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
                 (setq led-current-front-color (append (list front-color-highbeam) (mklist led-front-num 0)))
             }{
@@ -409,7 +409,7 @@
         })
     )
     (cond
-        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3) (= led-rear-strip-type 8) (= led-rear-strip-type 9)) {
+        ((or (= led-rear-strip-type 2) (= led-rear-strip-type 3) (= led-rear-strip-type 8) (= led-rear-strip-type 9) (= led-rear-strip-type 10)) {
             (if (and (<= led-dim-on-highbeam-brightness 0.0) (< direction 0) (= led-on 1) (= led-highbeam-on 1) (running-state) (!= state 5)){
                 (setq led-current-rear-color (append (list rear-color-highbeam) (mklist led-rear-num 0)))
             }{
@@ -494,7 +494,7 @@
                     (yield led-fix)
                     (rgbled-update led-status-buffer)
                 })
-                (if (and (> led-rear-strip-type 0)(>= led-rear-pin 0)) {
+                (if (and (> led-rear-strip-type 0) (>= led-rear-pin 0)) {
                     (rgbled-color led-rear-buffer 0 led-current-rear-color led-current-brightness-rear)
                     (rgbled-init led-rear-pin led-rear-type)
                     (yield led-fix)

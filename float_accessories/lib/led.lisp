@@ -136,7 +136,7 @@
     (setq led-fix (get-config 'led-fix))
     (setq led-show-battery-charging (get-config 'led-show-battery-charging))
     (setq led-front-highbeam-pin (get-config 'led-front-highbeam-pin))
-    (setq led-rear-highbeam-pin (get-config 'led-front-highbeam-pin))
+    (setq led-rear-highbeam-pin (get-config 'led-rear-highbeam-pin))
     (setq led-max-brightness (get-config 'led-max-brightness))
 })
 
@@ -170,11 +170,11 @@
     })
 
     (if (and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) {
-        (pwm-start 2000 0.0 0 led-front-highbeam-pin 12)
+        (pwm-start 1000 0.0 0 led-front-highbeam-pin 10)
     })
 
     (if (and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) {
-        (pwm-start 2000 0.0 1 led-rear-highbeam-pin 12)
+        (pwm-start 1000 0.0 1 led-rear-highbeam-pin 10)
     })
 
     (var front-highbeam-leds 0)
@@ -399,9 +399,14 @@
             })
         })
         ((and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) {
-            (if front-highbeam-on (pwm-set-duty (min led-brightness-highbeam led-max-brightness) 0) (pwm-set-duty 0.0 0))
+            (if front-highbeam-on {
+                (pwm-set-duty (min led-brightness-highbeam led-max-brightness) 0)
+                (setq led-current-brightness-front led-dim-on-highbeam-brightness)
+            } {
+                 (pwm-set-duty 0.0 0)
+                 (setq led-current-brightness-front led-current-brightness)
+            })
             (setq led-current-front-color led-front-color)
-            (setq led-current-brightness-front led-current-brightness)
         })
         (_ {
             (setq led-current-front-color led-front-color)
@@ -435,9 +440,14 @@
             })
         })
         ((and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) {
-            (if rear-highbeam-on (pwm-set-duty (min led-brightness-highbeam led-max-brightness) 1) (pwm-set-duty 0.0 1))
+            (if rear-highbeam-on {
+                (pwm-set-duty (min led-brightness-highbeam led-max-brightness) 1)
+                (setq led-current-brightness-rear led-dim-on-highbeam-brightness)
+            } {
+                 (pwm-set-duty 0.0 1)
+                 (setq led-current-brightness-rear led-current-brightness)
+            })
             (setq led-current-rear-color led-rear-color)
-            (setq led-current-brightness-rear led-current-brightness)
         })
         (_ {
             (setq led-current-rear-color led-rear-color)
@@ -579,7 +589,7 @@
             (if (> (length led-footpad-color) 0){
                 (cond
                     ((= led-mode-footpad 0) {
-                        (setq footpad-pattern-index (rainbow-pattern led-foodpad-color foodpad-pattern-index))
+                        (setq footpad-pattern-index (rainbow-pattern led-footpad-color footpad-pattern-index))
                     })
                 )
             })

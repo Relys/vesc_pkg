@@ -199,7 +199,7 @@
 })
 
 (defun pubmote-rx (src des data rssi) {
-    (if (get-config 'pubmote-enabled) {
+    (if (and (get-config 'pubmote-enabled) wifi-enabled-on-boot) {
         (if (should-lock-channel) {
             (lock-channel "ESP-NOW packet received")
         })
@@ -215,7 +215,7 @@
                 (var is-rev (bufget-u8 data 14))
                 ; (print (list jsy jsx bt-c bt-z is-rev))
                 ; (rcode-run-noret (get-config 'can-id) `(set-remote-state ,jsy ,jsx ,bt-c ,bt-z ,is-rev))
-                
+
                 (if (>= (get-config 'can-id) 0) {
                     (can-cmd (get-config 'can-id) (str-replace (to-str(list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
                 })

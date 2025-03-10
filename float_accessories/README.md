@@ -18,10 +18,12 @@ My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a>
 
 <H2>RELEASE NOTES</H2>
 
-Now with BMS and Pubmote (beta)
+Note: Requires 6.06 firmware (VESC and Express) for future BMS Tiltback in Refloat.
+
+Fixes for footpad status bar pattern, bms-min-voltage, footpad led, stock GT Highbeams and esp-now if WiFi is disabled.
 
 <H3>BUILD INFO</H3>
 
-Version 2.5
+Version 2.6
 
 Source code can be found here:  <a href='https://github.com/relys/vesc%5Fpkg'>https://github.com/relys/vesc_pkg</a>

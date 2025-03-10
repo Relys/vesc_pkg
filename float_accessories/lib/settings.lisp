@@ -473,7 +473,7 @@
 )
 
 (defun write-val-eeprom (name val)
-    (let 
+    (let
         (
             (addr (first (assoc eeprom-addrs name)))
             (type (second (assoc eeprom-addrs name)))
@@ -494,7 +494,7 @@
     (setq status-string (str-merge status-string (str-from-n bms-status "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-type "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-cycles "%d ")))
-    (setq status-string (str-merge status-string (str-from-n (wifi-get-chan) "%d ")))
+    (setq status-string (str-merge status-string (str-from-n (if wifi-enabled-on-boot (wifi-get-chan) -1) "%d ")))
     (send-data status-string)
 })
 

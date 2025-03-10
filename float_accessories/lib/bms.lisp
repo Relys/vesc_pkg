@@ -141,7 +141,7 @@
 (defun parse-cell-voltage (data){
     (var cell-index 0)
     (var total-voltage 0)
-    (var v-cell-min (bufget-u16 data (if bms-use-crypto 6 4)))
+    (var v-cell-min (/ (bufget-u16 data (if bms-use-crypto 6 4)) (if bms-use-crypto 10000.0 1000.0)))
     (var v-cell-max v-cell-min)
     (if cell-count-uninit {
         (set-bms-val 'bms-cell-num (/ (- (buflen data) 8) 2))

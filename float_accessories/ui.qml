@@ -22,14 +22,8 @@ Item {
     property bool statusTimeout: false
 
     Component.onCompleted: {
-        if (
-            !(
-                VescIf.getLastFwRxParams().hw.includes("Express")
-                || VescIf.getLastFwRxParams().hw.includes("Avaspark")
-            )
-            || VescIf.getLastFwRxParams().hw.includes("rESCue")
-        ) {
-            VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express, Avaspark or rESCue board", false, false)
+        if (VescIf.getLastFwRxParams().hwTypeStr() !== "Custom Module") {
+            VescIf.emitMessageDialog("Float Accessories", "Warning: It doesn't look like this is installed on a VESC Express.", false, false)
         }
 
         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)")
@@ -1026,6 +1020,7 @@ Item {
                                         {text: "Stock GT", value: 7},
                                         {text: "Avaspark Laserbeam V2", value: 8},
                                         {text: "Avaspark Laserbeam V2 Pint", value: 9},
+                                        {text: "Light-shutka Flashfires", value: 10},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -1157,6 +1152,7 @@ Item {
                                         {text: "Stock GT", value: 7},
                                         {text: "Avaspark Laserbeam V2", value: 8},
                                         {text: "Avaspark Laserbeam V2 Pint", value: 9},
+                                        {text: "Light-shutka Flashfires", value: 10},
                                     ]
                                     textRole: "text"
                                     valueRole: "value"
@@ -1858,6 +1854,10 @@ Item {
                 ledFrontNum.value = 10
                 ledFrontType.currentIndex = 0
                 break
+            case 10: // Light-shutka Flashfires
+                ledFrontNum.value = 20;
+                ledFrontType.currentIndex = 0
+                break
             default:
                 // Do nothing, keep user-defined values
         }
@@ -1899,6 +1899,10 @@ Item {
                 break
             case 9: // Avaspark Laserbeam V2 Pint
                 ledRearNum.value = 10
+                ledRearType.currentIndex = 0
+                break
+            case 10: // Light-shutka Flashfires
+                ledRearNum.value = 20
                 ledRearType.currentIndex = 0
                 break
             default:

@@ -32,7 +32,6 @@
 (def float-cmds '(
     (COMMAND_GET_INFO . 0)
     (COMMAND_GET_ALLDATA . 10)
-    (COMMAND_LCM_GET_BATTERY . 29)
 ))
 
 (def float-accessories-cmds '(
@@ -56,7 +55,6 @@
     (init-can)
     (loopwhile t {
         (setq loop-start-time  (secs-since 0))
-        (float-cmd can-id (list (assoc float-cmds 'COMMAND_LCM_GET_BATTERY)))
         (float-cmd can-id (list (assoc float-cmds 'COMMAND_GET_ALLDATA) 3))
 
         (if (or (>= bms-can-id 0) (< (secs-since bms-last-activity-time) 1)){
@@ -145,12 +143,6 @@
     (if (and (> (buflen data) 1) (= (bufget-u8 data 0) FLOAT_MAGIC)) {
         (setq can-last-activity-time (systime))
         (match (cossa float-cmds (bufget-u8 data 1))
-                (COMMAND_LCM_GET_BATTERY {
-                    (if  (> (buflen data) 2){
-                        (setq battery-percent-remaining (bufget-f32 data 2))
-                        (setq refloat-battery-percent t)
-                    })
-                })
                 (COMMAND_GET_ALLDATA {
                 (if (< can-id 0){
                     (set-config 'can-id discover-can-id)

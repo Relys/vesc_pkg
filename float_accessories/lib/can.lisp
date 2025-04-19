@@ -16,7 +16,6 @@
 (def fet-temp-filtered 0)
 (def motor-temp-filtered 0)
 (def odometer -1)
-(def battery-percent-remaining 0.0)
 (def can-id -1)
 (def bms-can-id -1)
 (def bms-is-charging nil)
@@ -145,12 +144,6 @@
     (if (and (> (buflen data) 1) (= (bufget-u8 data 0) FLOAT_MAGIC)) {
         (setq can-last-activity-time (systime))
         (match (cossa float-cmds (bufget-u8 data 1))
-                (COMMAND_LCM_GET_BATTERY {
-                    (if  (> (buflen data) 2){
-                        (setq battery-percent-remaining (bufget-f32 data 2))
-                        (setq refloat-battery-percent t)
-                    })
-                })
                 (COMMAND_GET_ALLDATA {
                 (if (< can-id 0){
                     (set-config 'can-id discover-can-id)
@@ -196,7 +189,7 @@
                                 })
                                 (if (and (>= mode 3) (>= (buflen data) 52)) {
                                     (setq odometer (bufget-u32 data 41))
-                                    (if (not refloat-battery-percent) (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 2)))
+                                    (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 2))
                                 })
                             })
                         })

@@ -31,7 +31,6 @@
 (def float-cmds '(
     (COMMAND_GET_INFO . 0)
     (COMMAND_GET_ALLDATA . 10)
-    (COMMAND_LCM_GET_BATTERY . 29)
 ))
 
 (def float-accessories-cmds '(
@@ -55,7 +54,6 @@
     (init-can)
     (loopwhile t {
         (setq loop-start-time  (secs-since 0))
-        (float-cmd can-id (list (assoc float-cmds 'COMMAND_LCM_GET_BATTERY)))
         (float-cmd can-id (list (assoc float-cmds 'COMMAND_GET_ALLDATA) 3))
 
         (if (or (>= bms-can-id 0) (< (secs-since bms-last-activity-time) 1)){

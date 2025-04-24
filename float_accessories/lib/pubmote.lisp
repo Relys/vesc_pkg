@@ -174,7 +174,7 @@
                     (bufset-u8 data 21 (floor (* fet-temp-filtered 2)))
                     (bufset-u8 data 22 (floor (* motor-temp-filtered 2)))
                     (bufset-u32 data 23 odometer)
-                    (bufset-u8 data 27 (floor (* battery-percent-remaining 2)))
+                    (bufset-u8 data 27 (floor (* battery-percent-remaining 200)))
                     (bufset-i32 data 28 (get-config 'esp-now-secret-code))
                     (esp-now-send esp-now-remote-mac data)
                 })

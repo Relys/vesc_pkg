@@ -20,10 +20,10 @@ My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a>
 
 Note: Requires 6.06 firmware (VESC and Express) for future BMS Tiltback in Refloat.
 
-Fixes for footpad status bar pattern, bms-min-voltage, footpad led, stock GT Highbeams and esp-now if WiFi is disabled.
+Fix for Refloat 1.10
 
 <H3>BUILD INFO</H3>
 
-Version 2.6
+Version 2.7
 
 Source code can be found here:  <a href='https://github.com/relys/vesc%5Fpkg'>https://github.com/relys/vesc_pkg</a>

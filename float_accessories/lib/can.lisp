@@ -187,7 +187,7 @@
                                 })
                                 (if (>= mode 3) {
                                     (setq odometer (bufget-u32 data 41))
-                                    (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 2))
+                                    (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 200))
                                 })
                             })
                         })

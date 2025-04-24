@@ -24,6 +24,6 @@ Fix for Refloat 1.10
 
 <H3>BUILD INFO</H3>
 
-Version 2.7
+Version 2.7b
 
 Source code can be found here:  <a href='https://github.com/relys/vesc%5Fpkg'>https://github.com/relys/vesc_pkg</a>

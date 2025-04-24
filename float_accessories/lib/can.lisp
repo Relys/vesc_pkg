@@ -23,7 +23,7 @@
 (def bms-charger-plug-in-time 0)
 (def vin -1)
 (def last-running-state-time 0)
-(def refloat-battery-percent nil)
+(def battery-percent-remaining 0.0)
 
 (def FLOAT_MAGIC 101)
 (def FLOAT_ACCESSORIES_MAGIC 102)
@@ -180,12 +180,12 @@
                                 (setq speed (/ (to-float (bufget-i16 data 26)) 10))
                                 (setq tot-current (/ (to-float (bufget-i16 data 28)) 10))
                                 (setq duty-cycle-now (/ (to-float (- (bufget-u8 data 32) 128)) 100))
-                                (if (and (>= mode 2) (>= (buflen data) 39)) {
+                                (if (>= mode 2) {
                                     (setq distance-abs (bufget-f32 data 34))
                                     (setq fet-temp-filtered (/ (bufget-u8 data 38) 2.0))
                                     (setq motor-temp-filtered (/ (bufget-u8 data 39) 2.0))
                                 })
-                                (if (and (>= mode 3) (>= (buflen data) 52)) {
+                                (if (>= mode 3) {
                                     (setq odometer (bufget-u32 data 41))
                                     (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 2))
                                 })

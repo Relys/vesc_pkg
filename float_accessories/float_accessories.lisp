@@ -53,6 +53,8 @@
         (if (= (get-config 'pubmote-enabled) 1) (setq pubmote-context-id (spawn pubmote-loop)))
     })
     (if (= (get-config 'bms-enabled) 1) (setq bms-context-id (spawn bms-loop)))
+
+    (if (str-cmp (sysinfo 'hw-name) "Twilight Lord LCM") (spawn humidity-loop))
 })
 ; Start the main
 (main)

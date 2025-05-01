@@ -76,3 +76,27 @@
         (setix color-list led-index new-color)
     })
 })
+
+(defunret init-humidity () {
+    (i2c-start 'rate-400k '10 '8)
+    (if (i2c-detect-addr 0x40) {
+        (i2c-tx-rx 0x40 '(2 0x10 0))
+        (i2c-tx-rx 0x40 '(0))
+        (return true)
+    })
+    (return false)
+})
+
+(defun humidity-loop () {
+    (if (init-humidity) {
+        (var rx (bufcreate 4))
+        (loopwhile t{
+            (sleep 5)
+            (i2c-tx-rx 0x40 '() rx)
+            (i2c-tx-rx 0x40 (list 0x0F 0x01))
+            (i2c-tx-rx 0x40 '(0)) ;
+            (setq hum (* (/ (bufget-u16 rx 2 'little-endian) 65536.0) 100.0))
+            (setq hum-temp (- (* (/ (bufget-u16 rx 0 'little-endian) 65536.0) 165.0) 40.5))
+        })
+    })
+})

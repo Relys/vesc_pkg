@@ -18,12 +18,11 @@ My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a>
 
 <H2>RELEASE NOTES</H2>
 
-Note: Requires 6.06 firmware (VESC and Express) for future BMS Tiltback in Refloat.
-
 Fix for Refloat 1.10
+Support for Humidity sensor in LCM
 
 <H3>BUILD INFO</H3>
 
-Version 2.7b
+Version 2.8
 
 Source code can be found here:  <a href='https://github.com/relys/vesc%5Fpkg'>https://github.com/relys/vesc_pkg</a>

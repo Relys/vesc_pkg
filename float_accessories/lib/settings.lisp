@@ -100,6 +100,9 @@
 (def can-last-activity-time (systime))
 (def bms-charge-state 0) ;0 if 100, 1 if 90
 
+(def hum -100)
+(def hum-temp -100)
+
 (defun recv-control (in-led-on in-led-highbeam-on in-led-brightness in-led-brightness-highbeam in-led-brightness-idle in-led-brightness-status in-bms-charge-state) {
     (setq led-on (to-i in-led-on))
     (setq led-highbeam-on (to-i in-led-highbeam-on))
@@ -495,6 +498,10 @@
     (setq status-string (str-merge status-string (str-from-n bms-battery-type "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-cycles "%d ")))
     (setq status-string (str-merge status-string (str-from-n (if wifi-enabled-on-boot (wifi-get-chan) -1) "%d ")))
+    (setq status-string (str-merge status-string (str-from-n hum "%.0f ")))
+    (setq status-string (str-merge status-string (str-from-n hum-temp "%.2f ")))
+    (setq status-string (str-merge status-string (str-from-n (get-bms-val 'bms-hum) "%.0f ")))
+    (setq status-string (str-merge status-string (str-from-n (get-bms-val 'bms-temp-hum) "%.0f ")))
     (send-data status-string)
 })
 

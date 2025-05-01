@@ -37,7 +37,7 @@ Item {
         onTriggered: {
             sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(status)")
             lastStatusTime++
-            
+
             if (lastStatusTime > 2) { // 2 second timeout
                 statusTimeout = true
             }
@@ -197,7 +197,7 @@ Item {
                         var sendKeysString = "(send-keys " + keyList + " " + counterList + ")";
                         console.log("Sending: " + sendKeysString);
                         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + sendKeysString);
-                        
+
                         keySettingPopup.close();
                     } else {
                         console.error("Invalid input: Both key and counter must result in 4 uint32 values each")
@@ -449,7 +449,7 @@ Item {
                                     }
                                 }
                             }
-                            
+
                             ColumnLayout {
                                 id: ledOnLayout
                                 visible: ledOn.checked
@@ -593,6 +593,30 @@ Item {
                                 Layout.fillWidth: true
                                 color: Utility.getAppHexColor("lightText")
                                 text: "BMS Status: Unknown"
+                            }
+                            Text {
+                                id: humidityStatus
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "LCM Humidity: Unknown"
+                            }
+                            Text {
+                                id: humidityTempStatus
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "LCM Temp: Unknown"
+                            }
+                            Text {
+                                id: bmsHumStatus
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "BMS Humidity: Unknown"
+                            }
+                            Text {
+                                id: bmsHumTempStatus
+                                Layout.fillWidth: true
+                                color: Utility.getAppHexColor("lightText")
+                                text: "BMS Temp: Unknown"
                             }
                         }
                     }
@@ -840,7 +864,7 @@ Item {
                                     text: "Show battery % while charging"
                                     checked: false
                                 }
-                                
+
                                 ColumnLayout {
                                     id: ledBrakeLightLayout
                                     visible: ledBrakeLightEnabled.checked
@@ -1311,7 +1335,7 @@ Item {
                                 }
                             }
                         }
-                        
+
                         GroupBox {
                             title: "LED Footpad Config"
                             Layout.fillWidth: true
@@ -1445,7 +1469,7 @@ Item {
                                         text: "Pubmote MAC: Unknown"
                                     }
                                 }
-                            
+
                                 RowLayout {
                                     spacing: 5
                                     id: pubmoteLayout2
@@ -1454,7 +1478,7 @@ Item {
                             }
                         }
                     }
-                    
+
                     ColumnLayout {
                         width: stackLayout.width
                         spacing: 10
@@ -1506,13 +1530,13 @@ Item {
                                             }
                                         }
                                     }
-                                    
+
                                     CheckBox {
                                         id: bmsRS485Chip
                                         text: "RS485 Chip (Required for encrypted BMS charger level without Owie RS485 bypass)"
                                         checked: false
                                     }
-                            
+
                                     Text {
                                         color: Utility.getAppHexColor("lightText")
                                         text: "RS485 RO/A Pin"
@@ -1556,7 +1580,7 @@ Item {
                                             value: -1
                                             editable: true
                                         }
-                                        
+
                                         Button {
                                             text: "Factory Init"
                                             //enabled: bmsConnected === 1
@@ -1754,9 +1778,9 @@ Item {
                             "<p>Beta Testers: Koddex, Pickles</p>" +
 
                             "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
-                            
+
                             "<p><b>BUILD INFO</b></p>" +
-                            "<p>Version 2.7b</p>" +
+                            "<p>Version 2.8</p>" +
                             "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
@@ -1768,7 +1792,7 @@ Item {
                 }
             }
         }
-        
+
         // Save and Restore Buttons
         RowLayout {
             Layout.fillWidth: true
@@ -1945,7 +1969,7 @@ Item {
         //console.log("Applying LED control settings after debounce")
         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(recv-control " + makeControlArgStr() + " )")
     }
-        
+
     function makeArgStr() {
         return [
             ledEnabled.checked * 1,
@@ -2158,7 +2182,7 @@ Item {
                 var floatPackageConnected = Number(tokens[1])
                 floatPackageStatus.text = "Float Package Status: " + (floatPackageConnected ? "Connected" : "Not Connected")
                 floatPackageStatus.color = floatPackageConnected ? "green" : "red"
-                
+
                 // Pubmote connection status
                 var pubmoteConnected = Number(tokens[2])
                 var wifiChannel = Number(tokens[7])
@@ -2177,6 +2201,21 @@ Item {
                 bmsError.text = "BMS Error: " + bmsStatusTemp + "\nCharging: " + ((bmsStatusTemp & 0x20)>0) + "\nEmpty: " + ((bmsStatusTemp & 0x04)>0) + "\nTemp: " + ((bmsStatusTemp & 0x03)>0) + "\nOvercharge: " + ((bmsStatusTemp & 0x08)>0) + "\nSoC Calibration: " + ((bmsStatusTemp & 0x40)>0)
                 bmsBatteryType.text = "Battery Type: " + Number(tokens[5])
                 bmsBatteryCycles.text = "Battery Cycles: " + Number(tokens[6])
+
+                // Humidity Sensor Status
+                var hum = parseFloat(tokens[8])
+                var humTemp = parseFloat(tokens[9])
+                humidityStatus.text = "LCM Humidity: " + (hum>-100 ? hum +"%" : "Unknown")
+                humidityStatus.color = hum>-100 ? (hum < 65 ? "green" :hum < 80 ? "orange" : "red") : "grey"
+                humidityTempStatus.text = "LCM Temp: " + (humTemp>-100 ?  Math.floor((humTemp * 1.8 + 32) * 100)/100 +"F " + humTemp + "C" : "Unknown")
+                humidityTempStatus.color = humTemp>-100 ? "green" : "grey"
+
+                var bmsHum = parseFloat(tokens[10])
+                var bmsHumTemp = parseFloat(tokens[11])
+                bmsHumStatus.text = "BMS Humidity: " + (bmsHum ? bmsHum +"%" : "Unknown")
+                bmsHumStatus.color = bmsHum ? (bmsHum < 65 ? "green" : bmsHum < 80 ? "orange" : "red") : "grey"
+                bmsHumTempStatus.text = "BMS Temp: " + (bmsHumTemp ? Math.floor((bmsHumTemp * 1.8 + 32) * 100)/100 +"F " + bmsHumTemp + "C" : "Unknown")
+                bmsHumTempStatus.color = bmsHumTemp ? "green" : "grey"
 
                 // Update status flags
                 lastStatusTime = 0  // Reset the timer when status is received

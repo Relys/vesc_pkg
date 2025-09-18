@@ -546,13 +546,12 @@ static void cmd_recv_all_data(Data *d, const uint8_t *buf, size_t len) {
     }
 
     int32_t off = 2;
-
+    d->can_last_activity_time = VESC_IF->system_time_ticks();
     // Fault?
     NEED(1);
     if (buf[off] == 69) {
         NEED(2);
         d->fault_code = buf[off + 1];
-        d->can_last_activity_time = VESC_IF->system_time_ticks();
         return;
     }
 

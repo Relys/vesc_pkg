@@ -49,12 +49,12 @@
         pubmote-version-major 
         pubmote-version-minor
         pubmote-version-patch
-        (ix esp-now-remote-mac-a 0)
-        (ix esp-now-remote-mac-a 1)
-        (ix esp-now-remote-mac-a 2)
-        (ix esp-now-remote-mac-a 3)
-        (ix esp-now-remote-mac-b 0)
-        (ix esp-now-remote-mac-b 1)
+        (if (ix esp-now-remote-mac-a 0) (ix esp-now-remote-mac-a 0) 0)
+        (if (ix esp-now-remote-mac-a 1) (ix esp-now-remote-mac-a 1) 0)
+        (if (ix esp-now-remote-mac-a 2) (ix esp-now-remote-mac-a 2) 0)
+        (if (ix esp-now-remote-mac-a 3) (ix esp-now-remote-mac-a 3) 0)
+        (if (ix esp-now-remote-mac-b 0) (ix esp-now-remote-mac-b 0) 0)
+        (if (ix esp-now-remote-mac-b 1) (ix esp-now-remote-mac-b 1) 0)
     ))
     ;(print (bytes-to-mac-str esp-now-remote-mac-a esp-now-remote-mac-b))
     (send-data payload)

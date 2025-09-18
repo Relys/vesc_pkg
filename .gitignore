@@ -12,3 +12,4 @@ confxml.h
 *.project
 *.settings
 *.vscode
+c_libs/RVfplib

@@ -12,7 +12,222 @@ Item {
     anchors.margins: 10
     property Commands mCommands: VescIf.commands()
     property int floatAccessoriesMagicQMLApp: 103
+    property int _COMMAND_QML_POP_UP: 0
+    property int _COMMAND_QML_MSG: 1
+    property int _COMMAND_QML_STATUS: 2
+
     property int floatAccessoriesMagic: 104
+    property int _COMMAND_GET_INFO: 0
+    property int _COMMAND_PUBMOTE_PAIR_START: 1
+    property int _COMMAND_PUBMOTE_PAIR_ACCEPT: 2
+    property int _COMMAND_PUBMOTE_PAIR_REJECT: 3
+    property int _COMMAND_GET_STATUS: 4
+    property int _COMMAND_REBOOT: 5
+
+    property int pubmotePairCode: -1 // Initialize with a default invalid value
+    property bool pubmoteEnabled: false // Initialize with a default invalid value
+    property bool pairingTimeout: false
+    property int remainingTime: 30 // Initialize with the full 30 seconds
+    property int lastStatusTime: 0
+    property bool statusTimeout: false
+    Timer {
+        id: debounceRebootTimer
+        interval: 500  // Half a second (500ms)
+        repeat: false
+        onTriggered: {
+            var bytes = new Uint8Array([floatAccessoriesMagic, _COMMAND_REBOOT]);
+            mCommands.sendCustomAppData(bytes.buffer);
+        }
+    }
+    Timer {
+        id: statusCheckTimer
+        interval: 1000 // Check status every second
+        running: true
+        repeat: true
+        onTriggered: {
+            var bytes = new Uint8Array([floatAccessoriesMagic, _COMMAND_GET_STATUS]);
+            mCommands.sendCustomAppData(bytes.buffer);
+            lastStatusTime++
+
+            if (lastStatusTime > 2) {
+                // 2 second timeout
+                statusTimeout = true
+            }
+        }
+    }
+    // Timer for 30-second timeout
+    Timer {
+        id: pairingTimeoutTimer
+        interval: 1000 // 1 second
+        running: false
+        repeat: true
+
+        onTriggered: {
+            remainingTime--; // Decrease the remaining time by 1 second
+
+            if (remainingTime <= 0) {
+                pairingTimeout = true;
+                var bytes = new Uint8Array([floatAccessoriesMagic, _COMMAND_PUBMOTE_PAIR_REJECT]);
+                mCommands.sendCustomAppData(bytes.buffer);
+                pubmotePairPopup.close();
+            }
+        }
+    }
+
+    // Popup for Pubmote pairing confirmation
+    Popup {
+        id: pubmotePairPopup
+        modal: true
+        focus: true
+        visible: false
+        width: parent.width * 0.8
+        height: parent.height * 0.3
+        anchors.centerIn: parent
+
+        background: Rectangle {
+            color: "black"
+            radius: 10
+        }
+
+        onVisibleChanged: {
+            if (visible) {
+                // Generate code only when the popup is shown
+                pubmotePairCode = Math.floor(1000 + Math.random() * 9000); // Generates a number between 1000 and 9999
+                pairingTimeout = false; // Reset timeout flag
+                remainingTime = 30; // Reset the timer to 30 seconds
+                pairingTimeoutTimer.start(); // Start the 1-second timer to count down
+
+                // Send the pairing request with the generated code
+                var bytes = new Uint8Array([floatAccessoriesMagic, _COMMAND_PUBMOTE_PAIR_START, 0, 0]);
+                new DataView(bytes.buffer).setInt16(2, pubmotePairCode, false);
+                mCommands.sendCustomAppData(bytes.buffer);
+            } else {
+                pairingTimeoutTimer.stop(); // Stop timer if the popup is closed
+            }
+        }
+
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 10
+
+            Text {
+                text: "Confirm Pubmote Pairing"
+                color: "white"
+                font.pointSize: 16
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Text {
+                text: "Pairing Code: " + pubmotePairCode
+                color: "white"
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            Text {
+                text: "Time remaining: " + remainingTime + " seconds"
+                color: "white"
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            RowLayout {
+                spacing: 10
+                Layout.alignment: Qt.AlignHCenter
+
+                Button {
+                    text: "Accept"
+                    onClicked: {
+                        if (!pairingTimeout) {
+                            var bytes = new Uint8Array([floatAccessoriesMagic, _COMMAND_PUBMOTE_PAIR_ACCEPT]);
+                            mCommands.sendCustomAppData(bytes.buffer);
+                            pubmotePairPopup.close();
+                        }
+                    }
+                }
+
+                Button {
+                    text: "Reject"
+                    onClicked: {
+                        var bytes = new Uint8Array([floatAccessoriesMagic, _COMMAND_PUBMOTE_PAIR_REJECT]);
+                        mCommands.sendCustomAppData(bytes.buffer);
+                        pubmotePairPopup.close();
+                    }
+                }
+            }
+        }
+    }
+
+    ColumnLayout {
+        //width: stackLayout.width
+        spacing: 10
+        Text {
+            Layout.alignment: Qt.AlignHCenter
+            color: Utility.getAppHexColor("lightText")
+            font.pointSize: 20
+            text: "Float Accessories"
+        }
+        GroupBox {
+            title: "Package"
+            Layout.fillWidth: true
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 10
+
+                // Status Texts Column
+                Text {
+                    id: lastStatusText
+                    Layout.fillWidth: true
+                    color: statusTimeout ? "red" : Utility.getAppHexColor("lightText")
+                    text: "Last Lisp Update: " + lastStatusTime + "s ago"
+                }
+                Text {
+                    id: floatPackageStatus
+                    Layout.fillWidth: true
+                    color: Utility.getAppHexColor("lightText")
+                    text: "Float Package Status: Unknown"
+                }
+                Button {
+                    text: "Reboot"
+                    onClicked: {
+                        debounceRebootTimer.restart()
+                    }
+                }
+            }
+        }
+        GroupBox {
+            title: "Pubmote"
+            Layout.fillWidth: true
+            enabled: pubmoteEnabled
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 5
+                Text {
+                    id: pubmoteStatus
+                    Layout.fillWidth: true
+                    color: Utility.getAppHexColor("lightText")
+                    text: "Pubmote Status: Unknown"
+                }
+                Text {
+                    id: pubmoteMacAddress
+                    color: Utility.getAppHexColor("lightText")
+                    text: "Pubmote MAC: Unknown"
+                }
+                Text {
+                    id: pubmoteVersion
+                    color: Utility.getAppHexColor("lightText")
+                    text: "Version: Unknown"
+                }
+                Button {
+                    text: "Pair Pubmote"
+                    onClicked: {
+                        pubmotePairPopup.open(); // Open the confirmation popup with the random code
+                    }
+                }
+
+            }
+        }
+    }
 
     function asciiFrom(bytes) {
         var s = ""
@@ -20,6 +235,32 @@ Item {
             s += String.fromCharCode(bytes[i])
         }
         return s
+    }
+
+    function toHex2(n) {
+        return (n & 0xFF).toString(16).padStart(2, "0").toUpperCase();
+    }
+
+    // Pack four bytes (big-endian) into one uint32
+    function packU32(b0, b1, b2, b3) {
+        return ((b0 & 0xFF) << 24) |
+        ((b1 & 0xFF) << 16) |
+        ((b2 & 0xFF) << 8) |
+        (b3 & 0xFF);
+    }
+
+    function macFromU32s(hi, lo) {
+        hi >>>= 0; lo >>>= 0;
+
+        var b0 = (hi >>> 24) & 0xFF;
+        var b1 = (hi >>> 16) & 0xFF;
+        var b2 = (hi >>> 8) & 0xFF;
+        var b3 = hi         & 0xFF;
+
+        var b4 = (lo >>> 24) & 0xFF; // <-- now using lo[0] and lo[1]
+        var b5 = (lo >>> 16) & 0xFF; // adjust if you actually want lower two
+
+        return [b0,b1,b2,b3,b4,b5].map(toHex2).join(":");
     }
     Connections {
         target: mCommands
@@ -30,23 +271,56 @@ Item {
                 if (magic == floatAccessoriesMagicQMLApp) {
                     var command = u8[1]
                     switch (command) {
-                        case 0: {//Pop-up box
-                            if (u8.length < 256)
-                            {
+                        case _COMMAND_QML_POP_UP: {
+                            //Pop-up box
+                            if (u8.length < 256) {
                                 var msg = asciiFrom(u8.subarray(2))
                                 VescIf.emitMessageDialog("Float Accessories", msg, false, false)
                             }
                         }
-                        case 1: {//Status msg
-                            if (u8.length < 16)
-                            {
-                                var msg = asciiFrom(u8.subarray(2))
-                                VescIf.emitStatusMessage(msg, true)
+                            case _COMMAND_QML_MSG: {
+                                //Status msg
+                                if (u8.length < 16) {
+                                    var msg = asciiFrom(u8.subarray(2))
+                                    VescIf.emitStatusMessage(msg, true)
+                                }
                             }
-                        }
+                                case _COMMAND_QML_STATUS: {
+                                    //Float Stats
+                                    if (u8.length < 16) {
+                                        lastStatusTime = 0 // Reset the timer when status is received
+                                        statusTimeout = false
+                                        var payload = u8.subarray(2);
+                                        // Float Package connection status
+                                        var floatPackageConnected = Number(payload[0])
+                                        floatPackageStatus.text = "Float Package Status: " + (floatPackageConnected ? "Connected" : "Not Connected")
+                                        floatPackageStatus.color = floatPackageConnected ? "green" : "red"
+                                        var pubmoteConnected = Number(payload[1])
+                                        var wifiChannel = Number(payload[2])
+                                        pubmoteStatus.text = "Pubmote Status: " + (
+                                            pubmoteConnected
+                                            ? "Connected (WiFi Channel " + (wifiChannel ? wifiChannel : "?") + ")"
+                                            : "Not Connected (WiFi Channel " + (wifiChannel ? wifiChannel : "?") + ")"
+                                        )
+                                        pubmoteStatus.color = pubmoteConnected ? "green" : "red"
+                                        pubmoteEnabled = Number(payload[3])
+                                        if (!pubmoteConnected) {
+                                            pubmoteVersion.text = "Version: Unknown";
+                                        } else {
+                                            var version = payload[4]+'.'+payload[5]+'.'+payload[6];
+                                            pubmoteVersion.text = "Version: " + version;
+                                        }
+                                        // usage with payload[7..14]
+                                        var hi = packU32(payload[7], payload[8], payload[9], payload[10]);
+                                        var lo = packU32(payload[11], payload[12], payload[13], payload[14]);
+
+                                        pubmoteMacAddress.text = "Pubmote MAC: " +
+                                        ((hi === 0 && lo === 0) ? "Not Paired" : macFromU32s(hi, lo));
+                                    }
+                                }
+                            }
                     }
                 }
             }
         }
     }
-}

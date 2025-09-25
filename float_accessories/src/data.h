@@ -65,6 +65,6 @@ typedef struct {
 
     int cell_num;
 
-    uint64_t can_last_activity_time;
+    systime_t can_last_activity_time;
 
 } Data;

@@ -277,7 +277,7 @@ static void main_thd(void *arg) {
     command_get_alldata_buf[1] = COMMAND_GET_ALLDATA;
     command_get_alldata_buf[2] = 3;
 
-    int command_get_hum_buf_size = 2;
+/*     int command_get_hum_buf_size = 2;
     uint8_t *command_get_hum_buf = VESC_IF->malloc(command_get_hum_buf_size);
     command_get_hum_buf[0] = FLOAT_MAGIC;
     command_get_hum_buf[1] = COMMAND_HUMIDITY;
@@ -290,7 +290,7 @@ static void main_thd(void *arg) {
     int command_light_ctrl_size = 5;
     uint8_t *command_light_ctrl = VESC_IF->malloc(command_light_ctrl_size);
     command_light_ctrl[0] = FLOAT_MAGIC;
-    command_light_ctrl[1] = COMMAND_LCM_LIGHT_CTRL;
+    command_light_ctrl[1] = COMMAND_LCM_LIGHT_CTRL; */
     
     //VESC_IF->thread_set_priority(-2);
     while (!VESC_IF->should_terminate()) {
@@ -306,7 +306,7 @@ static void main_thd(void *arg) {
                 time = 500;
                 command_get_alldata_buf[2]=3;
 
-                 if(!d->light_control_sync && d->lcm_enabled)
+/*                  if(!d->light_control_sync && d->lcm_enabled)
                 {
 
                     if(d->leds.cfg->headlights_on)
@@ -330,24 +330,29 @@ static void main_thd(void *arg) {
                     command_light_ctrl, command_light_ctrl_size, 2, d->can_id);
                 }
                 VESC_IF->send_app_data(
-                command_lights, command_lights_size, 2, d->can_id); 
+                command_lights, command_lights_size, 2, d->can_id);  */
                 
             }
             VESC_IF->send_app_data(
                 command_get_alldata_buf, command_get_alldata_buf_size, 2, d->can_id);
 
-            if (!check_humidity) {
+                if (VESC_IF->ts_to_age_s(d->can_last_activity_time) > 2.0)
+                {
+                    d->state.state=STATE_DISABLED;
+                }
+
+/*             if (!check_humidity) {
                 VESC_IF->send_app_data(command_get_hum_buf, command_get_hum_buf_size, 2, d->can_id);
                 check_humidity = true;
 
-            }
+            } */
         }
-        VESC_IF->sleep_ms(500);
+        VESC_IF->sleep_ms(time);
     }
     VESC_IF->free(command_get_alldata_buf);
-    VESC_IF->free(command_get_hum_buf);
+/*     VESC_IF->free(command_get_hum_buf);
     VESC_IF->free(command_lights);
-    VESC_IF->free(command_light_ctrl);
+    VESC_IF->free(command_light_ctrl); */
 }
 
 static void aux_thd(void *arg) {
@@ -487,7 +492,7 @@ static void decode_state_compat(uint8_t code, State *st) {
 static lbm_value ext_update_data(lbm_value *args, lbm_uint argn) {
     Data *d = (Data *) ARG;
     if (argn > 8) {
-        // d->can_last_activity_time = VESC_IF->system_time();
+        d->can_last_activity_time = VESC_IF->system_time_ticks();
         int state_byte = VESC_IF->lbm_dec_as_i32(args[0]);
         int switch_state_byte = VESC_IF->lbm_dec_as_i32(args[1]);
         decode_state_compat(state_byte & 0x0F, &d->state);
@@ -547,7 +552,7 @@ static void cmd_recv_all_data(Data *d, const uint8_t *buf, size_t len) {
     if (buf[off] == 69) {
         NEED(2);
         d->fault_code = buf[off + 1];
-        // d->can_last_activity_time = VESC_IF->system_time();
+        d->can_last_activity_time = VESC_IF->system_time_ticks();
         return;
     }
 
@@ -784,8 +789,45 @@ static lbm_value ext_can_id(lbm_value *args, lbm_uint argn) {
     return VESC_IF->lbm_enc_i32(d->float_accessories_conf.can_id);
 }
 
+static void app_set_cfg(Data *d, uint32_t hi, uint32_t lo, uint16_t secret_code){
+    d->float_accessories_conf.hardware.pubmote.mac_addr_hi=hi;
+    d->float_accessories_conf.hardware.pubmote.mac_addr_lo=lo;
+    d->float_accessories_conf.hardware.pubmote.secret_code = secret_code;
+    write_cfg_to_eeprom(d);
+}
+
+static int32_t app_get_cfg(Data *d, uint16_t index) {
+    unsigned long hi, lo;
+    switch (index) {
+    case (1):
+        return d->float_accessories_conf.hardware.pubmote.mac_addr_hi;
+    case (2):
+        return d->float_accessories_conf.hardware.pubmote.mac_addr_lo;
+    case (3):
+        return (uint32_t)d->float_accessories_conf.hardware.pubmote.secret_code;
+    case (4):
+        return (uint32_t)d->float_accessories_conf.hardware.pubmote.enabled;
+    default:
+        return 0;
+    }
+}
+// Register ext_cfg as a lisp extension
+static lbm_value ext_cfg(lbm_value *args, lbm_uint argn) {
+    Data *d = (Data *) ARG;
+    if (argn < 1 || argn > 3 || !VESC_IF->lbm_is_number(args[0])) {
+        return VESC_IF->lbm_enc_sym_eerror;
+    }
+
+    if(argn== 1) {
+        return VESC_IF->lbm_enc_u32(app_get_cfg(d,(uint16_t)VESC_IF->lbm_dec_as_u32(args[0])));
+    };
+
+    app_set_cfg(d,VESC_IF->lbm_dec_as_u32(args[0]),VESC_IF->lbm_dec_as_u32(args[1]), (uint16_t)VESC_IF->lbm_dec_as_u32(args[2]));
+    return VESC_IF->lbm_enc_sym_true; 
+}
+
 static void data_init(Data *d) {
-    memset(d, 0, sizeof(Data));
+    memset(d, 0, sizeof(Data));                 
     read_cfg_from_eeprom(d);
 
     d->fault_code = 0;
@@ -812,6 +854,8 @@ static void data_init(Data *d) {
     d->prev_brightness = 0.0;
     d->prev_idle_brightness = 0.0;
     d->prev_status_brightness = 0.0;
+
+    d->can_last_activity_time = VESC_IF->system_time_ticks();
 
     // note, we also need to keep State and Footpad stuff upto date while polling can.
     // TODO uncomment when done testing
@@ -899,6 +943,7 @@ INIT_FUN(lib_info *info) {
     VESC_IF->lbm_add_extension("ext-set-can-ids", ext_set_can_ids);
     VESC_IF->lbm_add_extension("ext-set-bms-info", ext_set_bms_info);
     VESC_IF->lbm_add_extension("ext-update-data", ext_update_data);
+    VESC_IF->lbm_add_extension("ext-cfg", ext_cfg);
 
     VESC_IF->set_app_data_handler(on_command_received);
     return true;

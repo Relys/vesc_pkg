@@ -172,7 +172,14 @@ typedef struct {
 } CfgHwLeds;
 
 typedef struct {
+    bool enabled;
+    uint32_t mac_addr_hi, mac_addr_lo;
+    uint16_t secret_code;
+} CfgPubmote;
+
+typedef struct {
     CfgHwLeds leds;
+    CfgPubmote pubmote;
 } CfgHardware;
 
 typedef struct {

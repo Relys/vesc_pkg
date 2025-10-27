@@ -1060,6 +1060,34 @@ p, li { white-space: pre-wrap; }
             <suffix></suffix>
             <vTx>7</vTx>
         </leds.status_idle.speed>
+        <hardware.leds.hw.name>
+            <longName>VESC Express Board Type</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Name of LED Board. Will override pin config.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>CFG_DFLT_HARDWARE_LED_HW_NAME</cDefine>
+            <valInt>0</valInt>
+            <enumNames>None</enumNames>
+            <enumNames>Custom</enumNames>
+        </hardware.leds.hw.name>
+        <hardware.leds.hw_name>
+            <longName>VESC Express Board Type</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Name of LED Board. Will override pin config.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>CFG_DFLT_HARDWARE_LED_HW_NAME</cDefine>
+            <valInt>0</valInt>
+            <enumNames>None</enumNames>
+            <enumNames>Custom</enumNames>
+        </hardware.leds.hw_name>
         <hardware.leds.enabled>
             <longName>LED Enabled</longName>
             <type>5</type>
@@ -1217,7 +1245,7 @@ p, li { white-space: pre-wrap; }
             <vTx>1</vTx>
         </hardware.leds.front.pin>
         <hardware.leds.front.strip_type>
-            <longName>LED Front Highbeam Strip Type</longName>
+            <longName>LED Front Strip Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
             <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
@@ -1226,9 +1254,18 @@ p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Type of LED strip&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
             <cDefine>CFG_DFLT_HARDWARE_LED_FRONT_STRIP_TYPE</cDefine>
-            <valInt>0</valInt>
+            <valInt>1</valInt>
             <enumNames>None</enumNames>
+            <enumNames>Custom</enumNames>
             <enumNames>Laserbeam</enumNames>
+            <enumNames>Laserbeam v2</enumNames>
+            <enumNames>Laserbeam Pint</enumNames>
+            <enumNames>Laserbeam Pint v2</enumNames>
+            <enumNames>Flashfire</enumNames>
+            <enumNames>JetFleet H4</enumNames>
+            <enumNames>JetFleet H4 (no limit)</enumNames>
+            <enumNames>JetFleet GT</enumNames>
+            <enumNames>Fungineers GTFO</enumNames>
         </hardware.leds.front.strip_type>
         <hardware.leds.front.order>
             <longName>Front LED Strip Order</longName>
@@ -1331,7 +1368,7 @@ p, li { white-space: pre-wrap; }
             <vTx>1</vTx>
         </hardware.leds.rear.pin>
         <hardware.leds.rear.strip_type>
-            <longName>LED Rear Highbeam Strip Type</longName>
+            <longName>LED Rear Strip Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
             <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
@@ -1340,9 +1377,18 @@ p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Type of LED strip&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
             <cDefine>CFG_DFLT_HARDWARE_LED_REAR_STRIP_TYPE</cDefine>
-            <valInt>0</valInt>
+            <valInt>1</valInt>
             <enumNames>None</enumNames>
+            <enumNames>Custom</enumNames>
             <enumNames>Laserbeam</enumNames>
+            <enumNames>Laserbeam v2</enumNames>
+            <enumNames>Laserbeam Pint</enumNames>
+            <enumNames>Laserbeam Pint v2</enumNames>
+            <enumNames>Flashfire</enumNames>
+            <enumNames>JetFleet H4</enumNames>
+            <enumNames>JetFleet H4 (no limit)</enumNames>
+            <enumNames>JetFleet GT</enumNames>
+            <enumNames>Fungineers GTFO</enumNames>
         </hardware.leds.rear.strip_type>
         <hardware.leds.rear.order>
             <longName>Rear LED Strip Order</longName>
@@ -1605,6 +1651,7 @@ p, li { white-space: pre-wrap; }
         <ser>hardware.pubmote.secret_code</ser>
         <ser>hardware.pubmote.mac_addr_hi</ser>
         <ser>hardware.pubmote.mac_addr_lo</ser>
+        <ser>hardware.leds.hw_name</ser>
     </SerOrder>
     <Grouping>
         <group>

@@ -150,9 +150,24 @@ typedef struct {
 } CfgLeds;
 
 typedef enum {
-    CUSTOM,
-    LASERBEAMS
+    STRIP_NONE,
+    STRIP_CUSTOM,
+    STRIP_LASERBEAMS,
+    STRIP_LASERBEAMS_V2,
+    STRIP_LASERBEAMS_PINT,
+    STRIP_LASERBEAMS_PINT_V2,
+    STRIP_FLASHFIRES,
+    STRIP_JETFLEET_H4,
+    STRIP_JETFLEET_H4_NO_LIMIT,
+    STRIP_JETFLEET_GT,
+    STRIP_GTFO,
+    //STOCK_GT
 } LedStripType;
+
+typedef enum {
+    HW_NONE,
+    HW_CUSTOM
+} CfgHwName;
 
 typedef struct {
     uint8_t pin;
@@ -164,6 +179,7 @@ typedef struct {
 } CfgLedStrip;
 
 typedef struct {
+    CfgHwName hw_name;
     bool enabled;
     uint8_t flicker;
     CfgLedStrip status;

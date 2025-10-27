@@ -83,9 +83,22 @@ bool led_driver_setup(LedDriver *driver, CfgHwLeds *hw_config, const LedStrip **
         const uint8_t ch = color_order_channels(strip->color_order);
         offsets[i] = total_bytes;
         size_t strip_highbeam_bytes = 0;
-        if(driver->configs[i].strip_type==LASERBEAMS)
-        {
-            strip_highbeam_bytes++;
+        switch(driver->configs[i].strip_type) {
+            case  STRIP_LASERBEAMS:
+            case  STRIP_LASERBEAMS_PINT:
+            case  STRIP_LASERBEAMS_V2:
+            case  STRIP_LASERBEAMS_PINT_V2:
+            case  STRIP_FLASHFIRES:
+                strip_highbeam_bytes = 1; // 1 LED for highbeam control
+                break;
+            case  STRIP_JETFLEET_H4:
+            case  STRIP_JETFLEET_H4_NO_LIMIT:
+            case  STRIP_JETFLEET_GT:
+            case  STRIP_GTFO:
+                strip_highbeam_bytes = 4;
+                break;
+            default:
+                break;
         }
         total_bytes += (size_t)(strip->length+strip_highbeam_bytes) * ch; // TODO Ok, here's where we add bytes for Highbeam control
     }
@@ -118,29 +131,108 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
         const uint8_t ch = color_order_channels(strip->color_order);
 
         size_t highbeam_leds=0;
-        if(driver->configs[i].strip_type == LASERBEAMS) {
-            highbeam_leds=1;
+        switch(driver->configs[i].strip_type){
+            case  STRIP_LASERBEAMS:
+            case  STRIP_LASERBEAMS_PINT:
+            case  STRIP_LASERBEAMS_V2:
+            case  STRIP_LASERBEAMS_PINT_V2:
+            case  STRIP_FLASHFIRES:
+                highbeam_leds=1; // 1 LED for highbeam control
+                break;
+            case  STRIP_JETFLEET_H4:
+            case  STRIP_JETFLEET_H4_NO_LIMIT:
+            case  STRIP_JETFLEET_GT:
+            case  STRIP_GTFO:
+                highbeam_leds=4;
+                break;
+            default:
+                break;
         }
-
         int k=0;
         for (uint32_t j = 0; j < strip->length+highbeam_leds; ++j) {// TODO We need to check if we have type of highbeam, and add the correct bytes here. Make sure we allocate the extra bytes needed in the led_driver_setup for the bitbuffer. The strips remain untouched.
             uint32_t color = 0x00000000;
-            if (driver->configs[i].strip_type == LASERBEAMS){
-                if(j==0) {
-                    if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
-                    {
-                        color = 0x000000FF;
-                    } else {
-                        color = 0x00000000;
+            switch (driver->configs[i].strip_type) {
+                case  STRIP_LASERBEAMS:
+                case  STRIP_LASERBEAMS_PINT:
+                case  STRIP_LASERBEAMS_V2:
+                case  STRIP_LASERBEAMS_PINT_V2:
+                case  STRIP_FLASHFIRES:
+                    switch(j) {
+                        case 0:
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            {
+                                color = 0x000000FF;
+                            } else {
+                                color = 0x00000000;
+                            }
+                            k++;
+                            break;
+                        default:
+                            color = strip->data[j-k];   // 0xWWRRGGBB
+                            break;
                     }
-                    k++;
-                } else
-                {
+                    break;
+                case  STRIP_JETFLEET_H4:
+                case  STRIP_JETFLEET_H4_NO_LIMIT:
+                    switch(j) {
+                        case 3:
+                        case 8:
+                        case 14:
+                        case 19:
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            {
+                                color = 0x000000FF;
+                            } else {
+                                color = 0x00000000;
+                            }
+                            k++;
+                            break;
+                        default:
+                            color = strip->data[j-k];   // 0xWWRRGGBB
+                            break;
+                    }
+                    break;
+                case  STRIP_JETFLEET_GT:
+                    switch(j) {
+                        case 1:
+                        case 4:
+                        case 10:
+                        case 13:
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            {
+                                color = 0x000000FF;
+                            } else {
+                                color = 0x00000000;
+                            }
+                            k++;
+                            break;
+                        default:
+                            color = strip->data[j-k];   // 0xWWRRGGBB
+                            break;
+                    }
+                    break;
+                case  STRIP_GTFO:
+                    switch(j) {
+                        case 3:
+                        case 6:
+                        case 9:
+                        case 13:
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            {
+                                color = 0x000000FF;
+                            } else {
+                                color = 0x00000000;
+                            }
+                            k++;
+                            break;
+                        default:
+                            color = strip->data[j-k];   // 0xWWRRGGBB
+                            break;
+                    }
+                    break;
+                default:
                     color = strip->data[j-k];   // 0xWWRRGGBB
-                }
-                
-            } else {
-                color = strip->data[j-k];   // 0xWWRRGGBB
+                    break;
             }
             uint8_t w = cgamma((color >> 24) & 0xFF);
             uint8_t r = cgamma((color >> 16) & 0xFF);

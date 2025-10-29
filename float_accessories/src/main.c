@@ -218,6 +218,112 @@ static bool set_cfg(uint8_t *buffer) {
     int old_front_pin = d->float_accessories_conf.hardware.leds.front.pin;
     int old_rear_pin = d->float_accessories_conf.hardware.leds.rear.pin;
     bool res = confparser_deserialize_floataccessoriesconfig(buffer, &d->float_accessories_conf);
+    // TODO: Special cases for LED strip types
+    switch (d->float_accessories_conf.hardware.leds.front.strip_type) {
+        case STRIP_LASERBEAMS:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 18;
+            break;
+        case STRIP_LASERBEAMS_V3:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 13;
+            break;
+        case STRIP_LASERBEAMS_PINT:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 16;
+            break;
+        case STRIP_LASERBEAMS_PINT_V3:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 10;
+            break;
+        case STRIP_FLASHFIRES:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 20;
+            break;
+        case STRIP_JETFLEET_H4:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 17;
+            break;
+        case STRIP_JETFLEET_H4_NO_LIMIT:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 17;
+            break;
+        case STRIP_JETFLEET_GT:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 11;
+            break;
+        case STRIP_GTFO:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.front.count = 10;
+            break;
+        case STRIP_STOCK_GT:
+            d->float_accessories_conf.hardware.leds.front.color_order = LED_COLOR_GRBW;
+            d->float_accessories_conf.hardware.leds.front.count = 11;
+            break;
+        default:
+            break;
+    }
+
+    switch (d->float_accessories_conf.hardware.leds.rear.strip_type) {
+        case STRIP_LASERBEAMS:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 18;
+            break;
+        case STRIP_LASERBEAMS_V3:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 13;
+            break;
+        case STRIP_LASERBEAMS_PINT:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 16;
+            break;
+        case STRIP_LASERBEAMS_PINT_V3:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 10;
+            break;
+        case STRIP_FLASHFIRES:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 20;
+            break;
+        case STRIP_JETFLEET_H4:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 17;
+            break;
+        case STRIP_JETFLEET_H4_NO_LIMIT:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 17;
+            break;
+        case STRIP_JETFLEET_GT:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 11;
+            break;
+        case STRIP_GTFO:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRB;
+            d->float_accessories_conf.hardware.leds.rear.count = 10;
+            break;
+        case STRIP_STOCK_GT:
+            d->float_accessories_conf.hardware.leds.rear.color_order = LED_COLOR_GRBW;
+            d->float_accessories_conf.hardware.leds.rear.count = 11;
+            break;
+        default:
+            break;
+    }
+
+    switch (d->float_accessories_conf.hardware.leds.hw_name) {
+        case HW_THOR:
+            d->float_accessories_conf.hardware.leds.status.pin = 8;
+            d->float_accessories_conf.hardware.leds.front.pin = 9;
+            d->float_accessories_conf.hardware.leds.rear.pin = 10;
+            break;
+        case HW_AVASPARK_RGB_MINI:
+            d->float_accessories_conf.hardware.leds.status.pin = 7;
+            d->float_accessories_conf.hardware.leds.front.pin = 9;
+            d->float_accessories_conf.hardware.leds.rear.pin = 8;
+            break;
+        default:
+            break;
+    }
+
 
     // don't allow to disable the package in the RUNNING state
     // if (d->state.state == STATE_RUNNING) {
@@ -368,7 +474,9 @@ static void aux_thd(void *arg) {
             d->motor.erpm,
             d->motor.duty_cycle,
             d->battery_percent_remaining/100.0,
-            d->distance_abs, false
+            d->distance_abs,
+            d->bms_is_charging,
+            d->motor.current
         ); //TODO implement is charging function
         VESC_IF->sleep_us(1e6 / LEDS_REFRESH_RATE);
     }
@@ -651,7 +759,7 @@ static void cmd_recv_all_data(Data *d, const uint8_t *buf, size_t len) {
         d->battery_percent_remaining = (float) buf[off++] / 2.0f;
     }
 
-    if (mode >= 4) {
+    if (mode >= 4) { // TODO: Maybe this should be handled in Refloat for VESC BMS?
         NEED(2 + 2);
         d->charging.current = buffer_get_float16(buf, 10.0f, &off);
         d->charging.voltage = buffer_get_float16(buf, 10.0f, &off);
@@ -856,6 +964,10 @@ static void data_init(Data *d) {
 
     d->can_last_activity_time = VESC_IF->system_time_ticks();
 
+     d->bms_charger_plugin_time = VESC_IF->system_time_ticks();
+     d->bms_charger_just_plugged = false;
+     d->bms_is_charging = false;
+
     // note, we also need to keep State and Footpad stuff upto date while polling can.
     // TODO uncomment when done testing
     state_init(&d->state);
@@ -881,11 +993,10 @@ static lbm_value ext_set_fw_version(lbm_value *args, lbm_uint argn) {
     return VESC_IF->lbm_enc_sym_true;
 }
 
-static lbm_value ext_set_can_ids(lbm_value *args, lbm_uint argn) {
+static lbm_value ext_set_can_id(lbm_value *args, lbm_uint argn) {
     Data *d = (Data *) ARG;
-    if (argn > 1) {
+    if (argn == 1) {
         d->can_id = VESC_IF->lbm_dec_as_i32(args[0]);
-        d->can_id_bms = VESC_IF->lbm_dec_as_i32(args[1]);
     }
     return VESC_IF->lbm_enc_sym_true;
 }
@@ -893,7 +1004,24 @@ static lbm_value ext_set_can_ids(lbm_value *args, lbm_uint argn) {
 static lbm_value ext_set_bms_info(lbm_value *args, lbm_uint argn) {
     Data *d = (Data *) ARG;
     if (argn > 0) {
-        d->cell_num = VESC_IF->lbm_dec_as_i32(args[0]);
+        d->can_id_bms = VESC_IF->lbm_dec_as_i32(args[0]);
+        d->cell_num = VESC_IF->lbm_dec_as_i32(args[1]);
+        d->charging.voltage = VESC_IF->lbm_dec_as_float(args[2]);
+        d->charging.current = VESC_IF->lbm_dec_as_float(args[3]);
+
+        if(d->can_id_bms >= 0) {
+            bool prev_charging_state = d->bms_is_charging;
+            d->bms_is_charging = ((d->charging.current > 0.1f || d->charging.current < -0.1f) && d->charging.voltage > 10.0f);
+            if (d->bms_is_charging && !prev_charging_state) {
+                d->bms_charger_just_plugged = true;
+                d->bms_charger_plugin_time = VESC_IF->system_time_ticks();
+            }
+            // Check if we're within 5 seconds of initial plug-in and charging started
+            if (!(d->bms_charger_just_plugged && VESC_IF->ts_to_age_s(d->bms_charger_plugin_time) <= 5.0)) {
+                // Reset the flag if more than 5 seconds have passed
+                d->bms_charger_just_plugged = false;
+            }
+        }
     }
     return VESC_IF->lbm_enc_sym_true;
 }
@@ -912,13 +1040,13 @@ INIT_FUN(lib_info *info) {
     info->stop_fun = stop;
     info->arg = d;
 
-    d->main_thread = VESC_IF->spawn(main_thd, 1536, "Float Accessories Main", d);
+    d->main_thread = VESC_IF->spawn(main_thd, 1536, "fa_main", d);
     if (!d->main_thread) {
         VESC_IF->printf("Failed to spawn Float Accessories Main thread.");
         return false;
     }
 
-    d->aux_thread = VESC_IF->spawn(aux_thd, 2048 * 2, "Float Accessories Aux", d);
+    d->aux_thread = VESC_IF->spawn(aux_thd, 2048 * 2, "fa_aux", d);
     if (!d->aux_thread) {
         VESC_IF->printf("Failed to spawn Float Accessories Auxiliary thread.");
         VESC_IF->request_terminate(d->main_thread);
@@ -939,7 +1067,7 @@ INIT_FUN(lib_info *info) {
     VESC_IF->lbm_add_extension("ext-dbg", ext_dbg);
     VESC_IF->lbm_add_extension("ext-can-id", ext_can_id);
     VESC_IF->lbm_add_extension("ext-set-fw-version", ext_set_fw_version);
-    VESC_IF->lbm_add_extension("ext-set-can-ids", ext_set_can_ids);
+    VESC_IF->lbm_add_extension("ext-set-can-id", ext_set_can_id);
     VESC_IF->lbm_add_extension("ext-set-bms-info", ext_set_bms_info);
     VESC_IF->lbm_add_extension("ext-update-data", ext_update_data);
     VESC_IF->lbm_add_extension("ext-cfg", ext_cfg);

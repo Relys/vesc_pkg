@@ -67,4 +67,7 @@ typedef struct {
 
     systime_t can_last_activity_time;
 
+    systime_t bms_charger_plugin_time;
+    bool bms_charger_just_plugged;
+    bool bms_is_charging;
 } Data;

@@ -72,8 +72,10 @@ bool led_driver_setup(LedDriver *driver, CfgHwLeds *hw_config, const LedStrip **
             break;
         }
     }
-
-    VESC_IF->rgbled_init(driver->configs[0].pin);
+    if(driver->configs[0].strip_type != STRIP_NONE)
+    {
+        VESC_IF->rgbled_init(driver->configs[0].pin);
+    }
 
     for (size_t i = 0; i < STRIP_COUNT; ++i) {
         const LedStrip *strip = led_strips[i];
@@ -86,8 +88,8 @@ bool led_driver_setup(LedDriver *driver, CfgHwLeds *hw_config, const LedStrip **
         switch(driver->configs[i].strip_type) {
             case  STRIP_LASERBEAMS:
             case  STRIP_LASERBEAMS_PINT:
-            case  STRIP_LASERBEAMS_V2:
-            case  STRIP_LASERBEAMS_PINT_V2:
+            case  STRIP_LASERBEAMS_V3:
+            case  STRIP_LASERBEAMS_PINT_V3:
             case  STRIP_FLASHFIRES:
                 strip_highbeam_bytes = 1; // 1 LED for highbeam control
                 break;
@@ -120,7 +122,7 @@ bool led_driver_setup(LedDriver *driver, CfgHwLeds *hw_config, const LedStrip **
     return true;
 }
 
-void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, bool forward) {
+void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, bool forward, float highbeams_brightness, float highbeams_dim_ratio) {
     if (!driver->bitbuffer) return;
     
     for (size_t i = 0; i < STRIP_COUNT; ++i) {
@@ -134,8 +136,8 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
         switch(driver->configs[i].strip_type){
             case  STRIP_LASERBEAMS:
             case  STRIP_LASERBEAMS_PINT:
-            case  STRIP_LASERBEAMS_V2:
-            case  STRIP_LASERBEAMS_PINT_V2:
+            case  STRIP_LASERBEAMS_V3:
+            case  STRIP_LASERBEAMS_PINT_V3:
             case  STRIP_FLASHFIRES:
                 highbeam_leds=1; // 1 LED for highbeam control
                 break;
@@ -149,26 +151,46 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
                 break;
         }
         int k=0;
-        for (uint32_t j = 0; j < strip->length+highbeam_leds; ++j) {// TODO We need to check if we have type of highbeam, and add the correct bytes here. Make sure we allocate the extra bytes needed in the led_driver_setup for the bitbuffer. The strips remain untouched.
+        for (uint32_t j = 0; j < strip->length+highbeam_leds; ++j) {//We need to check if we have type of highbeam, and add the correct bytes here. Make sure we allocate the extra bytes needed in the led_driver_setup for the bitbuffer. The strips remain untouched.
             uint32_t color = 0x00000000;
+            uint8_t w = 0;
+            uint8_t r = 0;
+            uint8_t g = 0;
+            uint8_t b = 0;
             switch (driver->configs[i].strip_type) {
+                case  STRIP_NONE:
+                    break;
                 case  STRIP_LASERBEAMS:
                 case  STRIP_LASERBEAMS_PINT:
-                case  STRIP_LASERBEAMS_V2:
-                case  STRIP_LASERBEAMS_PINT_V2:
+                case  STRIP_LASERBEAMS_V3:
+                case  STRIP_LASERBEAMS_PINT_V3:
                 case  STRIP_FLASHFIRES:
                     switch(j) {
                         case 0:
-                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
                             {
-                                color = 0x000000FF;
+                                uint8_t b = scale8(0xFF, highbeams_brightness);                          // scale blue by mapped factor
+                                color = (uint32_t)b;
                             } else {
                                 color = 0x00000000;
                             }
                             k++;
+                            w = (color >> 24) & 0xFF;
+                            r = (color >> 16) & 0xFF;
+                            g = (color >>  8) & 0xFF;
+                            b =  color        & 0xFF;
                             break;
                         default:
                             color = strip->data[j-k];   // 0xWWRRGGBB
+                            float dim_ratio = 1.0f;
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
+                            {
+                                dim_ratio = highbeams_dim_ratio;
+                            }
+                            w = cgamma(scale8((color >> 24) & 0xFF, dim_ratio));
+                            r = cgamma(scale8((color >> 16) & 0xFF, dim_ratio));
+                            g = cgamma(scale8((color >>  8) & 0xFF, dim_ratio));
+                            b = cgamma(scale8( color        & 0xFF, dim_ratio));
                             break;
                     }
                     break;
@@ -179,16 +201,43 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
                         case 8:
                         case 14:
                         case 19:
-                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
                             {
-                                color = 0x000000FF;
+                                float m = 0.0f;
+                                if (driver->configs[i].strip_type == STRIP_JETFLEET_H4_NO_LIMIT) {
+                                    m = map_range(highbeams_brightness, 0.6f, 1.0f);
+                                } else {
+                                    m = map_range(highbeams_brightness, 0.6f, 0.8f);
+                                }
+                                uint8_t b = scale8(0xFF, m);                          // scale blue by mapped factor
+                                color = (uint32_t)b;
                             } else {
                                 color = 0x00000000;
                             }
                             k++;
+                            w = (color >> 24) & 0xFF;
+                            r = (color >> 16) & 0xFF;
+                            g = (color >>  8) & 0xFF;
+                            b =  color        & 0xFF;
                             break;
                         default:
                             color = strip->data[j-k];   // 0xWWRRGGBB
+                            float cap_scale = 1.0f;
+                            if (driver->configs[i].strip_type == STRIP_JETFLEET_H4) {
+                                float cap = 0.8f;
+                                cap_scale = (strip->brightness > cap) ? (cap / strip->brightness) : 1.0f;
+                            }
+
+                            float dim_ratio = 1.0f;
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
+                            {
+                                dim_ratio = highbeams_dim_ratio;
+                            }
+                            float s = cap_scale * dim_ratio;   // total linear scale
+                            w = cgamma(scale8((color >> 24) & 0xFF, s));
+                            r = cgamma(scale8((color >> 16) & 0xFF, s));
+                            g = cgamma(scale8((color >>  8) & 0xFF, s));
+                            b = cgamma(scale8( color        & 0xFF, s));
                             break;
                     }
                     break;
@@ -198,16 +247,31 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
                         case 4:
                         case 10:
                         case 13:
-                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
                             {
-                                color = 0x000000FF;
+                                float m = map_range(highbeams_brightness, 0.6f, 1.0f);
+                                uint8_t b = scale8(0xFF, m);                          // scale blue by mapped factor
+                                color = (uint32_t)b;
                             } else {
                                 color = 0x00000000;
                             }
                             k++;
+                            w = (color >> 24) & 0xFF;
+                            r = (color >> 16) & 0xFF;
+                            g = (color >>  8) & 0xFF;
+                            b =  color        & 0xFF;
                             break;
                         default:
                             color = strip->data[j-k];   // 0xWWRRGGBB
+                            float dim_ratio = 1.0f;
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
+                            {
+                                dim_ratio = highbeams_dim_ratio;
+                            }
+                            w = cgamma(scale8((color >> 24) & 0xFF, dim_ratio));
+                            r = cgamma(scale8((color >> 16) & 0xFF, dim_ratio));
+                            g = cgamma(scale8((color >>  8) & 0xFF, dim_ratio));
+                            b = cgamma(scale8( color        & 0xFF, dim_ratio));
                             break;
                     }
                     break;
@@ -217,27 +281,42 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
                         case 6:
                         case 9:
                         case 13:
-                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward)) // TODO, need to handle direction as well.
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
                             {
-                                color = 0x000000FF;
+                                float m = map_range(highbeams_brightness, 0.4f, 1.0f);
+                                uint8_t b = scale8(0xFF, m);                          // scale blue by mapped factor
+                                color = (uint32_t)b;
                             } else {
                                 color = 0x00000000;
                             }
                             k++;
+                            w = (color >> 24) & 0xFF;
+                            r = (color >> 16) & 0xFF;
+                            g = (color >>  8) & 0xFF;
+                            b =  color        & 0xFF;
                             break;
                         default:
                             color = strip->data[j-k];   // 0xWWRRGGBB
+                            float dim_ratio = 1.0f;
+                            if((headlights_on && highbeams_on) && (i==1 && forward || i==2 && !forward))
+                            {
+                                dim_ratio = highbeams_dim_ratio;
+                            }
+                            w = cgamma(scale8((color >> 24) & 0xFF, dim_ratio));
+                            r = cgamma(scale8((color >> 16) & 0xFF, dim_ratio));
+                            g = cgamma(scale8((color >>  8) & 0xFF, dim_ratio));
+                            b = cgamma(scale8( color        & 0xFF, dim_ratio));
                             break;
                     }
                     break;
                 default:
                     color = strip->data[j-k];   // 0xWWRRGGBB
+                    w = cgamma((color >> 24) & 0xFF);
+                    r = cgamma((color >> 16) & 0xFF);
+                    g = cgamma((color >>  8) & 0xFF);
+                    b = cgamma( color        & 0xFF);
                     break;
             }
-            uint8_t w = cgamma((color >> 24) & 0xFF);
-            uint8_t r = cgamma((color >> 16) & 0xFF);
-            uint8_t g = cgamma((color >>  8) & 0xFF);
-            uint8_t b = cgamma( color        & 0xFF);
 
             switch (strip->color_order) {
             case LED_COLOR_GRB:   out[0]=g; out[1]=r; out[2]=b; break;
@@ -248,7 +327,7 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
             }
             out += ch;
         }
-        if(!driver->single_strip) {
+        if(!driver->single_strip && driver->configs[i].strip_type != STRIP_NONE) {
             const size_t bytes = (size_t)(strip->length + highbeam_leds) * ch;
             VESC_IF->rgbled_init(driver->configs[i].pin);
             VESC_IF->sleep_us(driver->flicker);
@@ -256,7 +335,7 @@ void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, 
         }
     }
 
-    if(driver->single_strip) {
+    if(driver->single_strip && driver->configs[0].strip_type != STRIP_NONE) {
         VESC_IF->rgbled_update(driver->bitbuffer, driver->bitbuffer_length);
     }
 }

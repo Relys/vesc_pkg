@@ -46,6 +46,9 @@ float clampf(float value, float min, float max);
  */
 void rate_limitf(float *value, float target, float step);
 
+float map_range(float x, float out_min, float out_max);
+uint8_t scale8(uint8_t v, float s);
+
 float powf(float x, float y);
 float fmodf(float x, float y);
 float fmaxf(float a, float b);

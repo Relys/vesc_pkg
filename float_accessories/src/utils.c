@@ -36,6 +36,20 @@ float clampf(float value, float min, float max) {
     return m > max ? max : m;
 }
 
+float map_range(float x, float out_min, float out_max) {
+    if (x < 0.0f) x = 0.0f;
+    if (x > 1.0f) x = 1.0f;
+    return out_min + (out_max - out_min) * x;
+}
+
+// 8-bit scale with clamp & round
+uint8_t scale8(uint8_t v, float s) {
+    int t = (int)(v * s + 0.5f);
+    if (t < 0)   t = 0;
+    if (t > 255) t = 255;
+    return (uint8_t)t;
+}
+
 
 // mini_math.c  — PIC-safe float math for rv32imc blobs (no libm, no F-ops)
 // Implements: fabsf, floorf, ceilf, roundf, lroundf, fminf, fmaxf, fmodf, powf

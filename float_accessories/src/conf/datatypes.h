@@ -134,12 +134,17 @@ typedef struct {
     bool on;
     bool headlights_on;
     bool highbeams_on;
+    float highbeams_brightness;
+    float highbeams_dim_ratio;
 
     LedTransition headlights_transition;
     LedTransition direction_transition;
 
     bool lights_off_when_lifted;
     bool status_on_front_when_lifted;
+
+    bool brake_light_on;
+    int8_t brake_light_min_amps;
 
     LedBar headlights;
     LedBar taillights;
@@ -153,20 +158,22 @@ typedef enum {
     STRIP_NONE,
     STRIP_CUSTOM,
     STRIP_LASERBEAMS,
-    STRIP_LASERBEAMS_V2,
+    STRIP_LASERBEAMS_V3,
     STRIP_LASERBEAMS_PINT,
-    STRIP_LASERBEAMS_PINT_V2,
+    STRIP_LASERBEAMS_PINT_V3,
     STRIP_FLASHFIRES,
     STRIP_JETFLEET_H4,
     STRIP_JETFLEET_H4_NO_LIMIT,
     STRIP_JETFLEET_GT,
     STRIP_GTFO,
-    //STOCK_GT
+    STRIP_STOCK_GT
 } LedStripType;
 
 typedef enum {
     HW_NONE,
-    HW_CUSTOM
+    HW_CUSTOM,
+    HW_THOR,
+    HW_AVASPARK_RGB_MINI
 } CfgHwName;
 
 typedef struct {

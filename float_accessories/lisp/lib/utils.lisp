@@ -155,6 +155,8 @@
     ;(ext-float-rx data)
     ; Only process data if data is long enough and magic number is correct
 
+    (ext-set-bms-info (get-bms-val 'bms-can-id) (get-bms-val 'bms-cell-num) (get-bms-val 'bms-v-charge) (get-bms-val 'bms-i-in-ic)); TODO: Move this to Refloat?
+
     (if (and (> (buflen data) 1) (= (bufget-u8 data 0) FLOAT_ACCESSORIES_MAGIC)) {
         (match (cossa float-accessories-cmds (bufget-u8 data 1))
             ;(COMMAND_GET_INFO {

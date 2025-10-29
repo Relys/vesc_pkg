@@ -24,7 +24,7 @@ typedef struct {
 // Public API
 void led_driver_init(LedDriver *driver);
 bool led_driver_setup(LedDriver *driver, CfgHwLeds *hw_cfg, const LedStrip **strips);
-void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, bool forward);
+void led_driver_paint(LedDriver *driver, bool headlights_on, bool highbeams_on, bool forward, float highbeams_brightness, float highbeams_dim_ratio);
 void led_driver_destroy(LedDriver *driver);
 
 #endif // LED_DRIVER_H

@@ -63,6 +63,50 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_LEDS_HIGHBEAMS_ON</cDefine>
             <valInt>1</valInt>
         </leds.highbeams_on>
+        <leds.highbeams_brightness>
+            <longName>Highbeam Brightness</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Highbeam LED brightness for strip types that have deticated highbeams.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>CFG_DFLT_LEDS_HIGHBEAMS_BRIGHTNESS</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>100</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>5</stepDouble>
+            <valDouble>0.8</valDouble>
+            <vTxDoubleScale>10000</vTxDoubleScale>
+            <suffix>%</suffix>
+            <vTx>7</vTx>
+        </leds.highbeams_brightness>
+        <leds.highbeams_dim_ratio>
+            <longName>Dim Highbeam Brightness Ratio</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Ratio to dim RGB LEDs when Highbeams are on.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>CFG_DFLT_LEDS_HIGHBEAMS_DIM_RATIO</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>100</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>5</stepDouble>
+            <valDouble>0.2</valDouble>
+            <vTxDoubleScale>10000</vTxDoubleScale>
+            <suffix>%</suffix>
+            <vTx>7</vTx>
+        </leds.highbeams_dim_ratio>
         <leds.headlights_transition>
             <longName>Headlights Transition</longName>
             <type>4</type>
@@ -123,6 +167,38 @@ p, li { white-space: pre-wrap; }
             <cDefine>CFG_DFLT_LEDS_STATUS_ON_FRONT_WHEN_LIFTED</cDefine>
             <valInt>1</valInt>
         </leds.status_on_front_when_lifted>
+        <leds.brake_light_on>
+            <longName>Brake Light</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Enable flashing brake light while breaking (&amp;lt;=-4A).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>CFG_DFLT_LEDS_BRAKE_LIGHT_ON</cDefine>
+            <valInt>1</valInt>
+        </leds.brake_light_on>
+        <leds.brake_light_min_amps>
+            <longName>Brake Light Min Amps</longName>
+            <type>2</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Number of regen amps it takes to trigger brake effect.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>CFG_DFLT_LEDS_BRAKE_LIGHT_MIN_AMPS</cDefine>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxInt>-1</maxInt>
+            <minInt>-10</minInt>
+            <showDisplay>0</showDisplay>
+            <stepInt>1</stepInt>
+            <valInt>-4</valInt>
+            <suffix> A</suffix>
+            <vTx>2</vTx>
+        </leds.brake_light_min_amps>
         <leds.front.mode>
             <longName>Front Mode</longName>
             <type>4</type>
@@ -1060,20 +1136,6 @@ p, li { white-space: pre-wrap; }
             <suffix></suffix>
             <vTx>7</vTx>
         </leds.status_idle.speed>
-        <hardware.leds.hw.name>
-            <longName>VESC Express Board Type</longName>
-            <type>4</type>
-            <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Name of LED Board. Will override pin config.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine>CFG_DFLT_HARDWARE_LED_HW_NAME</cDefine>
-            <valInt>0</valInt>
-            <enumNames>None</enumNames>
-            <enumNames>Custom</enumNames>
-        </hardware.leds.hw.name>
         <hardware.leds.hw_name>
             <longName>VESC Express Board Type</longName>
             <type>4</type>
@@ -1087,6 +1149,8 @@ p, li { white-space: pre-wrap; }
             <valInt>0</valInt>
             <enumNames>None</enumNames>
             <enumNames>Custom</enumNames>
+            <enumNames>Thor</enumNames>
+            <enumNames>Avaspark RGB Mini</enumNames>
         </hardware.leds.hw_name>
         <hardware.leds.enabled>
             <longName>LED Enabled</longName>
@@ -1100,7 +1164,7 @@ p, li { white-space: pre-wrap; }
 &lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/p&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Note: Pressing both footpad sensors when turning on the board will disable the LED initialization. Use if the LEDs break your VESC in a way that prevents you to connect and change configuration (e.g. due to an overcurrent).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
             <cDefine>CFG_DFLT_HARDWARE_LED_ENABLED</cDefine>
-            <valInt>1</valInt>
+            <valInt>0</valInt>
         </hardware.leds.enabled>
         <hardware.leds.flicker>
             <longName>LED Flicker Fix</longName>
@@ -1144,6 +1208,20 @@ p, li { white-space: pre-wrap; }
             <suffix></suffix>
             <vTx>1</vTx>
         </hardware.leds.status.pin>
+        <hardware.leds.status.strip_type>
+            <longName>LED Status Strip Type</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Type of LED strip&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>CFG_DFLT_HARDWARE_LED_STATUS_STRIP_TYPE</cDefine>
+            <valInt>0</valInt>
+            <enumNames>None</enumNames>
+            <enumNames>Custom</enumNames>
+        </hardware.leds.status.strip_type>
         <hardware.leds.status.order>
             <longName>Status LED Strip Order</longName>
             <type>4</type>
@@ -1254,18 +1332,19 @@ p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Type of LED strip&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
             <cDefine>CFG_DFLT_HARDWARE_LED_FRONT_STRIP_TYPE</cDefine>
-            <valInt>1</valInt>
+            <valInt>0</valInt>
             <enumNames>None</enumNames>
             <enumNames>Custom</enumNames>
             <enumNames>Laserbeam</enumNames>
-            <enumNames>Laserbeam v2</enumNames>
+            <enumNames>Laserbeam v3</enumNames>
             <enumNames>Laserbeam Pint</enumNames>
-            <enumNames>Laserbeam Pint v2</enumNames>
+            <enumNames>Laserbeam Pint v3</enumNames>
             <enumNames>Flashfire</enumNames>
             <enumNames>JetFleet H4</enumNames>
             <enumNames>JetFleet H4 (no limit)</enumNames>
             <enumNames>JetFleet GT</enumNames>
             <enumNames>Fungineers GTFO</enumNames>
+            <enumNames>Stock GT</enumNames>
         </hardware.leds.front.strip_type>
         <hardware.leds.front.order>
             <longName>Front LED Strip Order</longName>
@@ -1377,18 +1456,19 @@ p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Type of LED strip&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
             <cDefine>CFG_DFLT_HARDWARE_LED_REAR_STRIP_TYPE</cDefine>
-            <valInt>1</valInt>
+            <valInt>0</valInt>
             <enumNames>None</enumNames>
             <enumNames>Custom</enumNames>
             <enumNames>Laserbeam</enumNames>
-            <enumNames>Laserbeam v2</enumNames>
+            <enumNames>Laserbeam v3</enumNames>
             <enumNames>Laserbeam Pint</enumNames>
-            <enumNames>Laserbeam Pint v2</enumNames>
+            <enumNames>Laserbeam Pint v3</enumNames>
             <enumNames>Flashfire</enumNames>
             <enumNames>JetFleet H4</enumNames>
             <enumNames>JetFleet H4 (no limit)</enumNames>
             <enumNames>JetFleet GT</enumNames>
             <enumNames>Fungineers GTFO</enumNames>
+            <enumNames>Stock GT</enumNames>
         </hardware.leds.rear.strip_type>
         <hardware.leds.rear.order>
             <longName>Rear LED Strip Order</longName>
@@ -1478,7 +1558,7 @@ p, li { white-space: pre-wrap; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Roboto'; ; font-weight:400; font-style:normal;&quot;&gt;
 &lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Enable/disable pubmote&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
             <cDefine>CFG_DFLT_HARDWARE_PUBMOTE_ENABLED</cDefine>
-            <valInt>1</valInt>
+            <valInt>0</valInt>
         </hardware.pubmote.enabled>
         <hardware.pubmote.mac_addr_hi>
             <longName>Pubmote MAC Address</longName>
@@ -1652,6 +1732,11 @@ p, li { white-space: pre-wrap; }
         <ser>hardware.pubmote.mac_addr_hi</ser>
         <ser>hardware.pubmote.mac_addr_lo</ser>
         <ser>hardware.leds.hw_name</ser>
+        <ser>hardware.leds.status.strip_type</ser>
+        <ser>leds.highbeams_brightness</ser>
+        <ser>leds.highbeams_dim_ratio</ser>
+        <ser>leds.brake_light_on</ser>
+        <ser>leds.brake_light_min_amps</ser>
     </SerOrder>
     <Grouping>
         <group>
@@ -1663,10 +1748,14 @@ p, li { white-space: pre-wrap; }
                     <param>leds.on</param>
                     <param>leds.headlights_on</param>
                     <param>leds.highbeams_on</param>
+                    <param>leds.highbeams_brightness</param>
+                    <param>leds.highbeams_dim_ratio</param>
                     <param>leds.headlights_transition</param>
                     <param>leds.direction_transition</param>
                     <param>leds.lights_off_when_lifted</param>
                     <param>leds.status_on_front_when_lifted</param>
+                    <param>leds.brake_light_on</param>
+                    <param>leds.brake_light_min_amps</param>
                     <param>::sep::Front</param>
                     <param>leds.front.mode</param>
                     <param>leds.front.brightness</param>
@@ -1711,8 +1800,10 @@ p, li { white-space: pre-wrap; }
                 <subgroupParams>
                     <param>::sep::Leds (changes require reboot)</param>
                     <param>hardware.leds.enabled</param>
+                    <param>hardware.leds.hw_name</param>
                     <param>hardware.leds.flicker</param>
                     <param>hardware.leds.status.pin</param>
+                    <param>hardware.leds.status.strip_type</param>
                     <param>hardware.leds.status.count</param>
                     <param>hardware.leds.status.color_order</param>
                     <param>hardware.leds.status.reverse</param>

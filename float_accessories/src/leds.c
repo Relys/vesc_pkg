@@ -471,7 +471,7 @@ static void anim_disabled(Leds *leds, const LedStrip *strip, float time) {
 static void anim_button_state(Leds *leds,
                               const LedStrip *strip,
                               float soc,          // 0.0 .. 1.0
-                              bool isCharging,
+                              bool is_charging,
                               float time,
                               float speed)        // multiplier for pulse speed
 {
@@ -483,7 +483,7 @@ static void anim_button_state(Leds *leds,
 
     // Charging pulse: scale time by "speed"
     float pulse = 1.0f;
-    if (isCharging) {
+    if (is_charging) {
         pulse = 0.55f + 0.45f * cosine_progress(3.14159265f * time * speed);
         if (pulse < 0.10f) pulse = 0.10f;   // small floor to avoid going too dim
     }
@@ -841,17 +841,17 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg, FootpadSensor
     const LedStrip *strip_array[STRIP_COUNT] = {NULL};
     size_t strip_i = 0;
     for (uint8_t i = 1; i <= STRIP_COUNT; ++i) {
-        if (hw_cfg->status.order == i && hw_cfg->status.count > 0) {
+        if (hw_cfg->status.order == i && hw_cfg->status.count > 0 && hw_cfg->status.strip_type != STRIP_NONE) {
             led_strip_configure(&leds->status_strip, &hw_cfg->status);
             status_offset = current_offset;
             current_offset += leds->status_strip.length;
             strip_array[strip_i++] = &leds->status_strip;
-        } else if (hw_cfg->front.order == i && hw_cfg->front.count > 0) {
+        } else if (hw_cfg->front.order == i && hw_cfg->front.count > 0 && hw_cfg->front.strip_type != STRIP_NONE) {
             led_strip_configure(&leds->front_strip, &hw_cfg->front);
             front_offset = current_offset;
             current_offset += leds->front_strip.length;
             strip_array[strip_i++] = &leds->front_strip;
-        } else if (hw_cfg->rear.order == i && hw_cfg->rear.count > 0) {
+        } else if (hw_cfg->rear.order == i && hw_cfg->rear.count > 0  && hw_cfg->rear.strip_type != STRIP_NONE) {
             led_strip_configure(&leds->rear_strip, &hw_cfg->rear);
             rear_offset = current_offset;
             current_offset += leds->rear_strip.length;
@@ -867,7 +867,7 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg, FootpadSensor
         VESC_IF->printf("Both sensors pressed, not initializing LEDs.");
     } else if (leds->front_strip.length + leds->rear_strip.length > LEDS_FRONT_AND_REAR_COUNT_MAX) {
         VESC_IF->printf("Front and rear LED counts exceed maximum.");
-    } else if (hw_cfg->enabled && led_count > 0) {
+    } else if (hw_cfg->enabled && hw_cfg->hw_name != HW_NONE && led_count > 0) {
         led_data = VESC_IF->malloc(sizeof(uint32_t) * led_count);
         if (!led_data) {
             VESC_IF->printf("Failed to init LED data, out of memory.");
@@ -908,6 +908,18 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg, FootpadSensor
     }
 }
 
+// Overlay a red/black flash on the rear (relative to direction).
+void brake_overlay(Leds *leds, bool is_braking, float now_s) {
+    if (!is_braking) return;
+    LedStrip *rear = leds->direction_forward ? &leds->rear_strip : &leds->front_strip;
+    if (!rear || rear->length == 0) return;
+
+    // 10 Hz, 50% duty strobe (tweak as you like)
+    bool on = fmodf(now_s * 10.0f, 1.0f) < 0.5f;
+    uint32_t col = on ? 0x00FF0000u : 0x00000000u; // RED : BLACK
+    strip_set_color(leds, rear, col, 1.0f, 1.0f);
+}
+
 void leds_configure(Leds *leds, const CfgLeds *cfg) {
     leds->duty_threshold = fmaxf(cfg->status.duty_threshold, 0.15);
 
@@ -919,7 +931,7 @@ void leds_configure(Leds *leds, const CfgLeds *cfg) {
     leds->status_on_front_idle_time = current_time;
 }
 
-void leds_update(Leds *leds, const State *state, FootpadSensorState fs_state, float pitch, float rpm, float duty_cycle_now, float battery_level, float distance_abs, bool is_charging) {
+void leds_update(Leds *leds, const State *state, FootpadSensorState fs_state, float pitch, float rpm, float duty_cycle_now, float battery_level, float distance_abs, bool is_charging, float motor_current) {
     if (!leds->led_data) {
         return;
     }
@@ -1025,7 +1037,7 @@ void leds_update(Leds *leds, const State *state, FootpadSensorState fs_state, fl
         anim_disabled(leds, &leds->front_strip, current_time);
         anim_disabled(leds, &leds->rear_strip, current_time);
         anim_disabled(leds, &leds->status_strip, current_time);
-        led_driver_paint(&leds->led_driver, headlights_should_be_on(leds), leds->cfg->highbeams_on && (leds->front_bar->brightness > 0.0 || leds->rear_bar->brightness > 0.0), rpm > -ERPM_MOVING_THRESHOLD);
+        led_driver_paint(&leds->led_driver, headlights_should_be_on(leds), leds->cfg->highbeams_on && (leds->front_bar->brightness > 0.0 || leds->rear_bar->brightness > 0.0), rpm > -ERPM_MOVING_THRESHOLD, leds->cfg->highbeams_brightness, leds->cfg->highbeams_dim_ratio);
         return;
     }
 
@@ -1221,8 +1233,11 @@ void leds_update(Leds *leds, const State *state, FootpadSensorState fs_state, fl
             leds->status_on_front_idle_blend, rpm, duty_cycle_now, battery_level, is_charging
         );
     }
-
-    led_driver_paint(&leds->led_driver, headlights_should_be_on(leds), leds->cfg->highbeams_on && (leds->front_bar->brightness > 0.0 || leds->rear_bar->brightness > 0.0), rpm > -ERPM_MOVING_THRESHOLD);
+    if(leds->cfg->brake_light_on)
+    {
+        brake_overlay(leds, motor_current <= leds->cfg->brake_light_min_amps, current_time);
+    }
+    led_driver_paint(&leds->led_driver, headlights_should_be_on(leds), leds->cfg->highbeams_on && (leds->front_bar->brightness > 0.0 || leds->rear_bar->brightness > 0.0), rpm > -ERPM_MOVING_THRESHOLD, leds->cfg->highbeams_brightness, leds->cfg->highbeams_dim_ratio);
 }
 
 void leds_status_confirm(Leds *leds) {

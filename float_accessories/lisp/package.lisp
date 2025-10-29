@@ -33,7 +33,7 @@
     ;(var can-id nil)
     (if can-id {
         (print (str-merge "Found can-id: " (str-from-n can-id)))
-        (ext-set-can-ids can-id (get-bms-val 'bms-can-id))
+        (ext-set-can-id can-id)
 
         ;(spawn can-loop can-id)
         (setq pubmote-enabled (= (ext-cfg 4) 1))

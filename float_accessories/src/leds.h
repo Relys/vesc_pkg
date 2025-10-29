@@ -84,7 +84,7 @@ void leds_setup(Leds *leds, CfgHwLeds *hw_cfg, const CfgLeds *cfg, FootpadSensor
 
 void leds_configure(Leds *leds, const CfgLeds *cfg);
 
-void leds_update(Leds *leds, const State *state, FootpadSensorState fs_state, float pitch, float rpm, float duty_cycle_now, float battery_level, float distance_abs, bool is_charging);
+void leds_update(Leds *leds, const State *state, FootpadSensorState fs_state, float pitch, float rpm, float duty_cycle_now, float battery_level, float distance_abs, bool is_charging, float motor_current);
 
 void leds_status_confirm(Leds *leds);
 

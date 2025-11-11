@@ -320,6 +320,11 @@ static bool set_cfg(uint8_t *buffer) {
             d->float_accessories_conf.hardware.leds.front.pin = 9;
             d->float_accessories_conf.hardware.leds.rear.pin = 8;
             break;
+        case HW_FLOATFAB_LCM:
+            d->float_accessories_conf.hardware.leds.status.pin = 7;
+            d->float_accessories_conf.hardware.leds.front.pin = 9;
+            d->float_accessories_conf.hardware.leds.rear.pin = 10;
+            break;
         default:
             break;
     }

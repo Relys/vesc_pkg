@@ -1151,6 +1151,7 @@ p, li { white-space: pre-wrap; }
             <enumNames>Custom</enumNames>
             <enumNames>Thor</enumNames>
             <enumNames>Avaspark RGB Mini</enumNames>
+            <enumNames>FloatFab LCM</enumNames>
         </hardware.leds.hw_name>
         <hardware.leds.enabled>
             <longName>LED Enabled</longName>

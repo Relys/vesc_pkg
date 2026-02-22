@@ -173,7 +173,8 @@ typedef enum {
     HW_NONE,
     HW_CUSTOM,
     HW_THOR,
-    HW_AVASPARK_RGB_MINI
+    HW_AVASPARK_RGB_MINI,
+    HW_FLOATFAB_LCM
 } CfgHwName;
 
 typedef struct {

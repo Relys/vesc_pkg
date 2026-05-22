@@ -14,6 +14,23 @@
 (def pubmote-version-minor 0)
 (def pubmote-version-patch 0)
 
+(def bt-c-blinker-prev 0)
+(def bt-c-blinker-press-time (systime))
+(def bt-c-blinker-hold nil)
+(def bt-c-click-count 0)
+(def bt-c-last-release-time (systime))
+(def btn-horn-prev 0)
+(def bt-z-beep-start (systime))
+(def bt-z-beep-fired nil)
+
+(defunret mac-match (a b) {
+    (if (!= (length a) (length b)) (return nil))
+    (looprange i 0 (length a) {
+        (if (!= (ix a i) (ix b i)) (return nil))
+    })
+    (return t)
+})
+
 (def rem-cmds '(
     ; Remote version commands
     (REM_VERSION . 0)
@@ -147,7 +164,7 @@
 })
 
 (defun should-send-message () {
-    (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0))
+    (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= can-id 0))
 })
 
 (defun pubmote-loop () {
@@ -251,7 +268,7 @@
 })
 
 (defun should-process-message (src data) {
-    (and (= pairing-state 0) (eq esp-now-remote-mac src) (= (bufget-i32 data 1 'little-endian) (get-config 'esp-now-secret-code)))
+    (and (= pairing-state 0) (mac-match esp-now-remote-mac src) (= (bufget-i32 data 1 'little-endian) (get-config 'esp-now-secret-code)))
 })
 
 (defun reset-last-activity-time () {
@@ -326,17 +343,52 @@
                 (if (and (should-process-message src data) (= (buflen data) 17)) {
                     (reset-last-activity-time)
 
-                    ;(print (list "Received" src des data rssi))
                     (var jsy (bufget-f32 data 5 'little-endian))
                     (var jsx (bufget-f32 data 9 'little-endian))
                     (var bt-c (bufget-u8 data 13))
                     (var bt-z (bufget-u8 data 14))
                     (var is-rev (bufget-u8 data 15))
-                    ; (print (list jsy jsx bt-c bt-z is-rev))
-                    ; (rcode-run-noret (get-config 'can-id) `(set-remote-state ,jsy ,jsx ,bt-c ,bt-z ,is-rev))
 
-                    (if (>= (get-config 'can-id) 0) {
-                        (can-cmd (get-config 'can-id) (str-replace (to-str(list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
+                    ; bt_z hold > 0.8s = horn
+                    (if (= bt-z 1) {
+                        (if (= btn-horn-prev 0) {
+                            (setq bt-z-beep-start (systime))
+                            (setq bt-z-beep-fired nil)
+                        })
+                        (if (and (not bt-z-beep-fired) (> (secs-since bt-z-beep-start) 0.8)) {
+                            (trigger-beep)
+                            (setq bt-z-beep-fired t)
+                        })
+                    }{
+                        (setq bt-z-beep-fired nil)
+                    })
+                    (setq btn-horn-prev bt-z)
+
+                    ; bt_c click counter: 1=left blinker, 2=right blinker, 3+=horn
+                    (var btn-blinker (= bt-c 1))
+                    (if (and (= bt-c 1) (= bt-c-blinker-prev 0)) {
+                        (setq bt-c-click-count (+ bt-c-click-count 1))
+                        (setq bt-c-last-release-time (systime))
+                    })
+                    (if (and (= bt-c 0) (= bt-c-blinker-prev 1)) {
+                        (setq bt-c-last-release-time (systime))
+                    })
+                    (setq bt-c-blinker-prev bt-c)
+
+                    (if (and (> bt-c-click-count 0) (not btn-blinker)
+                             (> (secs-since bt-c-last-release-time) 0.4)) {
+                        (if (= bt-c-click-count 1) {
+                            (set-blinker (if (= blinker-state (blinker-l)) 0 (blinker-l)))
+                        } (if (= bt-c-click-count 2) {
+                            (set-blinker (if (= blinker-state (blinker-r)) 0 (blinker-r)))
+                        } {
+                            (if (>= can-id 0) (trigger-beep))
+                        }))
+                        (setq bt-c-click-count 0)
+                    })
+
+                    (if (and (>= can-id 0) (> (secs-since horn-last-start-time) 1.0)) {
+                        (can-cmd can-id (str-replace (to-str (list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
                     })
                 } {
                    (print "Conditions not met for set remote state")

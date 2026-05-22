@@ -301,7 +301,7 @@
         })
         (var dont-freeze-update (not (and (running-state) (= led-update-not-running 1) (> (secs-since led-run-start-time) 1))))
         (update-leds (secs-since led-last-activity-time) anim-time)
-        (led-flush-buffers dont-freeze-update)
+        (trap (led-flush-buffers dont-freeze-update))
 
         (setq loop-end-time (secs-since 0))
         (var actual-loop-time (- loop-end-time loop-start-time))
@@ -750,6 +750,32 @@
             (setix led-footpad-color i (color-mix (ix prev-led-footpad-color i) (ix target-led-footpad-color i)  blend-ratio))
         })
         (setix led-button-color 0 (color-mix (ix prev-led-button-color 0) (ix target-led-button-color 0)  blend-ratio))
+    })
+
+    (if (!= blinker-state 0) {
+        (var blink-on (= (to-i (floor (mod (* anim-time 3.0) 2.0))) 0))
+        (if (and blinker-prev-on (not blink-on)) {
+            (setq blinker-flash-count (+ blinker-flash-count 1))
+            (if (>= blinker-flash-count 4) (set-blinker 0))
+        })
+        (setq blinker-prev-on blink-on)
+        (if (!= blinker-state 0) {
+            (var blink-color (if blink-on 0x00FF9900 0x00000000))
+            (if (> (length led-front-color) 1) {
+                (var flen (length led-front-color))
+                (var fhalf (/ flen 2))
+                (var fstart (if (= blinker-state 1) fhalf 0))
+                (var fend   (if (= blinker-state 1) flen fhalf))
+                (looprange i fstart fend { (setix led-front-color i blink-color) })
+            })
+            (if (> (length led-rear-color) 1) {
+                (var rlen (length led-rear-color))
+                (var rhalf (/ rlen 2))
+                (var rstart (if (= blinker-state 1) rhalf 0))
+                (var rend   (if (= blinker-state 1) rlen rhalf))
+                (looprange i rstart rend { (setix led-rear-color i blink-color) })
+            })
+        })
     })
 })
 

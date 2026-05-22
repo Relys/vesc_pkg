@@ -81,6 +81,19 @@
             })
         })
 
+        (if (and (= (get-config 'auto-blinker-enabled) 1) (>= can-id 0)) {
+            (var thresh (get-config 'auto-blinker-angle))
+            (if (> roll-angle thresh) {
+                (if (!= blinker-state (blinker-r)) (set-blinker (blinker-r)))
+                (setq blinker-flash-count 0)
+            } (if (< roll-angle (- 0 thresh)) {
+                (if (!= blinker-state (blinker-l)) (set-blinker (blinker-l)))
+                (setq blinker-flash-count 0)
+            } (if (< (abs roll-angle) (* thresh 0.8))
+                (if (!= blinker-state 0) (set-blinker 0))
+            )))
+        })
+
         (setq loop-end-time (secs-since 0))
         (var actual-loop-time (- loop-end-time loop-start-time))
         (var time-to-wait (- next-run-time (secs-since 0)))

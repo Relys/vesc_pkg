@@ -93,6 +93,12 @@
     (humidity-enabled          . (84 b 0))
     (humidity-sda-pin          . (85 i -1))
     (humidity-slc-pin          . (86 i -1))
+    (horn-freq                 . (87 i 180))
+    (horn-amps                 . (88 f 4.0))
+    (horn-duration             . (89 f 0.6))
+    (auto-blinker-enabled      . (90 b 0))
+    (auto-blinker-angle        . (91 f 10.0))
+    (auto-blinker-invert       . (92 b 0))
 ))
 (def runtime-vals)
 (setq runtime-vals (mklist (length eeprom-addrs) -1))
@@ -133,6 +139,39 @@
 
 (def hum 0)
 (def hum-temp 0)
+
+(def blinker-state 0)
+(def blinker-flash-count 0)
+(def blinker-prev-on nil)
+(def horn-fire-count 0)
+(def horn-last-start-time (systime))
+
+(defun set-blinker (state) {
+    (setq blinker-state state)
+    (setq blinker-flash-count 0)
+    (setq blinker-prev-on nil)
+})
+(defun blinker-l () (if (= (get-config 'auto-blinker-invert) 1) 2 1))
+(defun blinker-r () (if (= (get-config 'auto-blinker-invert) 1) 1 2))
+(defun horn-sequence () {
+    (setq horn-last-start-time (systime))
+    (var freq (str-from-n (get-config 'horn-freq)))
+    (var amps (str-from-n (get-config 'horn-amps) "%.1f"))
+    (var dur  (str-from-n (get-config 'horn-duration) "%.2f"))
+    (can-cmd can-id (str-merge
+        "(spawn (fn () {"
+        "(foc-play-tone 0 " freq " " amps ")"
+        "(sleep " dur ")"
+        "(foc-play-tone 0 " freq " 0)"
+        "}))"
+    ))
+})
+(defun trigger-beep () {
+    (if (>= can-id 0) {
+        (setq horn-fire-count (+ horn-fire-count 1))
+        (horn-sequence)
+    })
+})
 
 (defun recv-control (in-led-on in-led-highbeam-on in-led-brightness in-led-brightness-highbeam in-led-brightness-idle in-led-brightness-status in-bms-charge-state) {
     (setq led-on (to-i in-led-on))
@@ -190,6 +229,7 @@
     in-led-dim-on-highbeam-ratio in-bms-type in-led-status-strip-type in-bms-charge-only in-led-fix in-led-show-battery-charging
     in-led-front-highbeam-pin in-led-rear-highbeam-pin in-bms-buff-size in-led-max-brightness in-soc-type in-cell-type in-led-update-not-running
     in-log-enabled in-log-rate in-log-append-gnss in-humidity-enabled in-humidity-sda-pin in-humidity-slc-pin
+    in-horn-freq in-horn-amps in-horn-duration in-auto-blinker-enabled in-auto-blinker-angle in-auto-blinker-invert
 ) {
 
     (if (or (!= (to-i in-led-enabled) (to-i (get-config 'led-enabled)))  (!= (to-i in-pubmote-enabled) (to-i (get-config 'pubmote-enabled))) (!= (to-i in-bms-enabled) (to-i (get-config 'bms-enabled)))){
@@ -394,6 +434,13 @@
     }{
         (stop-log)
     })
+
+    (set-config 'horn-freq (to-i in-horn-freq))
+    (set-config 'horn-amps (to-float in-horn-amps))
+    (set-config 'horn-duration (to-float in-horn-duration))
+    (set-config 'auto-blinker-enabled (to-i in-auto-blinker-enabled))
+    (set-config 'auto-blinker-angle (to-float in-auto-blinker-angle))
+    (set-config 'auto-blinker-invert (to-i in-auto-blinker-invert))
 
     (save-config)
     (send-config)

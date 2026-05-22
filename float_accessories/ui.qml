@@ -465,6 +465,10 @@ Item {
                 visible: logEnabled.checked
                 width: logEnabled.checked ? implicitWidth : 0
             }
+            TabButton {
+                text: qsTr("Advance")
+                width: implicitWidth
+            }
         }
 
         // Stack Layout
@@ -498,6 +502,61 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         currentIndex: tabBar2.currentIndex
+                    }
+
+                    GroupBox {
+                        title: "Blinker"
+                        Layout.fillWidth: true
+                        visible: pubmoteEnabled.checked
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
+
+                            Text {
+                                color: Utility.getAppHexColor("lightText")
+                                text: "bt_c (X button) on remote: single click = left, double click = right.\nbt_z held > 0.8 s = motor beep.\nManual override:"
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                            }
+
+                            RowLayout {
+                                spacing: 5
+                                Layout.fillWidth: true
+
+                                Button {
+                                    text: "◀ Left"
+                                    Layout.fillWidth: true
+                                    onClicked: {
+                                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(set-blinker (blinker-l))")
+                                    }
+                                }
+
+                                Button {
+                                    text: "Off"
+                                    Layout.fillWidth: true
+                                    onClicked: {
+                                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(set-blinker 0)")
+                                    }
+                                }
+
+                                Button {
+                                    text: "Right ▶"
+                                    Layout.fillWidth: true
+                                    onClicked: {
+                                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(set-blinker (blinker-r))")
+                                    }
+                                }
+                            }
+
+                            Button {
+                                text: "Beep"
+                                Layout.fillWidth: true
+                                onClicked: {
+                                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(trigger-beep)")
+                                }
+                            }
+                        }
                     }
 
                     GroupBox {
@@ -1929,6 +1988,112 @@ Item {
                             }
                         }
                     }
+
+                    ColumnLayout {
+                        width: stackLayout.width
+                        spacing: 10
+                        visible: tabBar2.currentIndex === 4
+
+                        GroupBox {
+                            title: "Auto Blinker"
+                            Layout.fillWidth: true
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 10
+
+                                CheckBox {
+                                    id: autoBlinkerEnabled
+                                    text: "Enable Auto Blinker"
+                                    checked: false
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Tilt angle (°): " + autoBlinkerAngle.value.toFixed(0) + "  (normal turns: 5–15°)"
+                                    visible: autoBlinkerEnabled.checked
+                                }
+
+                                Slider {
+                                    id: autoBlinkerAngle
+                                    from: 3
+                                    to: 30
+                                    value: 10
+                                    stepSize: 1
+                                    Layout.fillWidth: true
+                                    visible: autoBlinkerEnabled.checked
+                                }
+
+                                CheckBox {
+                                    id: autoBlinkerInvert
+                                    text: "Swap left / right (applies to all blinkers)"
+                                    checked: false
+                                    visible: true
+                                }
+                            }
+                        }
+
+                        GroupBox {
+                            title: "Horn Settings"
+                            Layout.fillWidth: true
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 10
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Frequency (Hz)"
+                                }
+
+                                SpinBox {
+                                    id: hornFreq
+                                    from: 50
+                                    to: 2000
+                                    value: 180
+                                    stepSize: 10
+                                    editable: true
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Amplitude (amps): " + hornAmps.value.toFixed(1)
+                                }
+
+                                Slider {
+                                    id: hornAmps
+                                    from: 0.5
+                                    to: 10.0
+                                    value: 4.0
+                                    stepSize: 0.5
+                                    Layout.fillWidth: true
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Duration (seconds): " + hornDuration.value.toFixed(1)
+                                }
+
+                                Slider {
+                                    id: hornDuration
+                                    from: 0.1
+                                    to: 3.0
+                                    value: 0.6
+                                    stepSize: 0.1
+                                    Layout.fillWidth: true
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Save"
+                            Layout.fillWidth: true
+                            enabled: readConfig && lastStatusTime < 2
+                            onClicked: {
+                                sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(recv-config " + makeArgStr() + " )")
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2124,7 +2289,7 @@ Item {
                             "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
 
                             "<p><b>BUILD INFO</b></p>" +
-                            "<p>Version 3.2.2</p>" +
+                            "<p>Version 3.5.18</p>" +
                             "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
@@ -2411,7 +2576,13 @@ Item {
             logAppendGnss.checked * 1,
             humidityEnabled.checked * 1,
             humiditySdaPin.value,
-            humiditySlcPin.value
+            humiditySlcPin.value,
+            hornFreq.value,
+            parseFloat(hornAmps.value).toFixed(1),
+            parseFloat(hornDuration.value).toFixed(1),
+            autoBlinkerEnabled.checked * 1,
+            parseFloat(autoBlinkerAngle.value).toFixed(1),
+            autoBlinkerInvert.checked * 1
         ].join(" ");
     }
 
@@ -2434,6 +2605,7 @@ Item {
         if (ledEnabled.checked) newIndices.push(0)
         if (pubmoteEnabled.checked) newIndices.push(1)
         if (bmsEnabled.checked) newIndices.push(2)
+        newIndices.push(4)  // Additional Settings always available
         enabledIndices = newIndices
     }
 
@@ -2565,6 +2737,12 @@ Item {
                 humidityEnabled.checked = Number(tokens[85])
                 humiditySdaPin.value = Number(tokens[86])
                 humiditySlcPin.value = Number(tokens[87])
+                hornFreq.value = Number(tokens[88])
+                hornAmps.value = Number(tokens[89])
+                hornDuration.value = Number(tokens[90])
+                autoBlinkerEnabled.checked = Number(tokens[91])
+                autoBlinkerAngle.value = Number(tokens[92])
+                autoBlinkerInvert.checked = Number(tokens[93])
 
                 isPubmotePaired = (Number(tokens[46]) != -1);
                 pubmoteMacAddress.text = "MAC: " + (!isPubmotePaired ? "Not Paired" : macAddress.toUpperCase());

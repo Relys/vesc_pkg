@@ -178,7 +178,7 @@
 (defun get-var (i) i)
 
 (defun get-version () {
-    (list 3 2 0) ; Major, Minor, Patch
+    (list 3 5 18) ; Major, Minor, Patch
 })
 
 (defun is-606-or-newer () {

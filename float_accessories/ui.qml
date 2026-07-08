@@ -87,6 +87,14 @@ Item {
     property real bmsHumTemp: 0
     property int loggerRunning: 0
     property string pubmoteVersionStr: "Unknown"
+    property real pubmoteJsY: 0.0
+    property real pubmoteJsX: 0.0
+    property int pubmoteBtC: 0
+    property int pubmoteBtZ: 0
+    property int pubmoteIsRev: 0
+    property int pubmoteBlinkerState: 0
+    property int pubmoteClickCount: 0
+    property int pubmoteHornCount: 0
 
     Component.onCompleted: {
         if (VescIf.getLastFwRxParams().hwTypeStr() !== "Custom Module") {
@@ -465,6 +473,10 @@ Item {
                 visible: logEnabled.checked
                 width: logEnabled.checked ? implicitWidth : 0
             }
+            TabButton {
+                text: qsTr("Advance")
+                width: implicitWidth
+            }
         }
 
         // Stack Layout
@@ -498,6 +510,61 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         currentIndex: tabBar2.currentIndex
+                    }
+
+                    GroupBox {
+                        title: "Blinker"
+                        Layout.fillWidth: true
+                        visible: pubmoteEnabled.checked
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 10
+
+                            Text {
+                                color: Utility.getAppHexColor("lightText")
+                                text: "js_x (X button) on remote: single click = left, double click = right.\nbt_z held > 0.8 s = motor beep.\nManual override:"
+                                wrapMode: Text.WordWrap
+                                Layout.fillWidth: true
+                            }
+
+                            RowLayout {
+                                spacing: 5
+                                Layout.fillWidth: true
+
+                                Button {
+                                    text: "◀ Left"
+                                    Layout.fillWidth: true
+                                    onClicked: {
+                                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(set-blinker (blinker-l))")
+                                    }
+                                }
+
+                                Button {
+                                    text: "Off"
+                                    Layout.fillWidth: true
+                                    onClicked: {
+                                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(set-blinker 0)")
+                                    }
+                                }
+
+                                Button {
+                                    text: "Right ▶"
+                                    Layout.fillWidth: true
+                                    onClicked: {
+                                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(set-blinker (blinker-r))")
+                                    }
+                                }
+                            }
+
+                            Button {
+                                text: "Beep"
+                                Layout.fillWidth: true
+                                onClicked: {
+                                    sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(trigger-beep)")
+                                }
+                            }
+                        }
                     }
 
                     GroupBox {
@@ -1694,6 +1761,162 @@ Item {
                                         pubmotePairPopup.open();  // Open the confirmation popup with the random code
                                     }
                                 }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 1
+                                    color: Utility.getAppHexColor("lightText")
+                                    opacity: 0.3
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Button Mapping"
+                                    font.bold: true
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    wrapMode: Text.WordWrap
+                                    Layout.fillWidth: true
+                                    text: "js_x (X button) click counter:\n  1 click → left blinker toggle\n  2 clicks → right blinker toggle\n  3+ clicks → horn\n\nbt_z (dedicated button) → hold > 0.8 s → horn"
+                                }
+                            }
+                        }
+
+                        GroupBox {
+                            title: "Live Input Monitor"
+                            Layout.fillWidth: true
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 12
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 20
+
+                                    Item {
+                                        width: 120
+                                        height: 120
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            color: "#1e1e1e"
+                                            border.color: "#555555"
+                                            border.width: 1
+                                            radius: 6
+                                        }
+
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: parent.width - 8
+                                            height: 1
+                                            color: "#444444"
+                                        }
+
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 1
+                                            height: parent.height - 8
+                                            color: "#444444"
+                                        }
+
+                                        Rectangle {
+                                            id: jsDot
+                                            width: 14; height: 14; radius: 7
+                                            color: "#00BFFF"
+                                            border.color: "#FFFFFF"; border.width: 1
+                                            x: (parent.width  / 2) + (pubmoteJsX * 50) - 7
+                                            y: (parent.height / 2) - (pubmoteJsY * 50) - 7
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        spacing: 8
+                                        Layout.fillWidth: true
+
+                                        Text {
+                                            text: "Buttons"
+                                            color: Utility.getAppHexColor("lightText")
+                                            font.bold: true
+                                        }
+
+                                        RowLayout {
+                                            spacing: 6
+                                            Rectangle {
+                                                width: 12; height: 12; radius: 6
+                                                color: pubmoteBtC ? "#00FF00" : "#404040"
+                                                border.color: "#666666"; border.width: 1
+                                            }
+                                            Text {
+                                                text: "js_x  — blinker / horn"
+                                                color: Utility.getAppHexColor("lightText")
+                                                font.pixelSize: 12
+                                            }
+                                        }
+
+                                        RowLayout {
+                                            spacing: 6
+                                            Rectangle {
+                                                width: 12; height: 12; radius: 6
+                                                color: pubmoteBtZ ? "#00FF00" : "#404040"
+                                                border.color: "#666666"; border.width: 1
+                                            }
+                                            Text {
+                                                text: "bt_z  — horn (hold 0.8 s)"
+                                                color: Utility.getAppHexColor("lightText")
+                                                font.pixelSize: 12
+                                            }
+                                        }
+
+                                        RowLayout {
+                                            spacing: 6
+                                            Rectangle {
+                                                width: 12; height: 12; radius: 6
+                                                color: pubmoteIsRev ? "#FFA500" : "#404040"
+                                                border.color: "#666666"; border.width: 1
+                                            }
+                                            Text {
+                                                text: "is_rev"
+                                                color: Utility.getAppHexColor("lightText")
+                                                font.pixelSize: 12
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            height: 1
+                                            color: "#444444"
+                                        }
+
+                                        Text {
+                                            text: "Blinker: " + (pubmoteBlinkerState === 0 ? "Off" :
+                                                  pubmoteBlinkerState === 1 ? "← Left" : "Right →")
+                                            color: pubmoteBlinkerState !== 0 ? "#FF9900" : Utility.getAppHexColor("lightText")
+                                            font.bold: pubmoteBlinkerState !== 0
+                                        }
+
+                                        Text {
+                                            text: "Pending clicks: " + pubmoteClickCount
+                                            color: pubmoteClickCount > 0 ? "#00CCFF" : Utility.getAppHexColor("lightText")
+                                            font.bold: pubmoteClickCount > 0
+                                        }
+
+                                        Text {
+                                            text: "Horn fired: " + pubmoteHornCount + "×"
+                                            color: pubmoteHornCount > 0 ? "#FF4444" : Utility.getAppHexColor("lightText")
+                                            font.bold: pubmoteHornCount > 0
+                                        }
+
+                                        Text {
+                                            text: "js_y: " + pubmoteJsY.toFixed(3) + "   js_x: " + pubmoteJsX.toFixed(3)
+                                            color: Utility.getAppHexColor("lightText")
+                                            font.family: "monospace"
+                                            font.pixelSize: 12
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1929,6 +2152,113 @@ Item {
                             }
                         }
                     }
+
+                    ColumnLayout {
+                        width: stackLayout.width
+                        spacing: 10
+                        visible: tabBar2.currentIndex === 4
+
+                        GroupBox {
+                            title: "Auto Blinker"
+                            Layout.fillWidth: true
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 10
+
+                                CheckBox {
+                                    id: autoBlinkerEnabled
+                                    text: "Enable Auto Blinker"
+                                    checked: false
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Tilt angle (°): " + autoBlinkerAngle.value.toFixed(0) + "  (normal turns: 5–15°)"
+                                    visible: autoBlinkerEnabled.checked
+                                }
+
+                                Slider {
+                                    id: autoBlinkerAngle
+                                    from: 3
+                                    to: 30
+                                    value: 10
+                                    stepSize: 1
+                                    Layout.fillWidth: true
+                                    visible: autoBlinkerEnabled.checked
+                                }
+
+                                CheckBox {
+                                    id: autoBlinkerInvert
+                                    text: "Swap left / right (applies to all blinkers)"
+                                    checked: false
+                                    visible: true
+                                }
+
+                            }
+                        }
+
+                        GroupBox {
+                            title: "Horn Settings"
+                            Layout.fillWidth: true
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 10
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Frequency (Hz)"
+                                }
+
+                                SpinBox {
+                                    id: hornFreq
+                                    from: 50
+                                    to: 2000
+                                    value: 180
+                                    stepSize: 10
+                                    editable: true
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Amplitude (amps): " + hornAmps.value.toFixed(1)
+                                }
+
+                                Slider {
+                                    id: hornAmps
+                                    from: 0.5
+                                    to: 10.0
+                                    value: 4.0
+                                    stepSize: 0.5
+                                    Layout.fillWidth: true
+                                }
+
+                                Text {
+                                    color: Utility.getAppHexColor("lightText")
+                                    text: "Duration (seconds): " + hornDuration.value.toFixed(1)
+                                }
+
+                                Slider {
+                                    id: hornDuration
+                                    from: 0.1
+                                    to: 3.0
+                                    value: 0.6
+                                    stepSize: 0.1
+                                    Layout.fillWidth: true
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: "Save"
+                            Layout.fillWidth: true
+                            enabled: readConfig && lastStatusTime < 2
+                            onClicked: {
+                                sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(recv-config " + makeArgStr() + " )")
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2124,7 +2454,7 @@ Item {
                             "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
 
                             "<p><b>BUILD INFO</b></p>" +
-                            "<p>Version 3.2.2</p>" +
+                            "<p>Version 3.5.23</p>" +
                             "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
@@ -2411,7 +2741,13 @@ Item {
             logAppendGnss.checked * 1,
             humidityEnabled.checked * 1,
             humiditySdaPin.value,
-            humiditySlcPin.value
+            humiditySlcPin.value,
+            hornFreq.value,
+            parseFloat(hornAmps.value).toFixed(1),
+            parseFloat(hornDuration.value).toFixed(1),
+            autoBlinkerEnabled.checked * 1,
+            parseFloat(autoBlinkerAngle.value).toFixed(1),
+            autoBlinkerInvert.checked * 1
         ].join(" ");
     }
 
@@ -2434,6 +2770,7 @@ Item {
         if (ledEnabled.checked) newIndices.push(0)
         if (pubmoteEnabled.checked) newIndices.push(1)
         if (bmsEnabled.checked) newIndices.push(2)
+        newIndices.push(4)  // Additional Settings always available
         enabledIndices = newIndices
     }
 
@@ -2565,6 +2902,12 @@ Item {
                 humidityEnabled.checked = Number(tokens[85])
                 humiditySdaPin.value = Number(tokens[86])
                 humiditySlcPin.value = Number(tokens[87])
+                hornFreq.value = Number(tokens[88])
+                hornAmps.value = Number(tokens[89])
+                hornDuration.value = Number(tokens[90])
+                autoBlinkerEnabled.checked = Number(tokens[91])
+                autoBlinkerAngle.value = Number(tokens[92])
+                autoBlinkerInvert.checked = Number(tokens[93])
 
                 isPubmotePaired = (Number(tokens[46]) != -1);
                 pubmoteMacAddress.text = "MAC: " + (!isPubmotePaired ? "Not Paired" : macAddress.toUpperCase());
@@ -2638,6 +2981,16 @@ Item {
             } else if (str.startsWith("status")) {
                 var msg = str.substring(7)
                 VescIf.emitStatusMessage(msg, true)
+            } else if (str.startsWith("pubmote-input")) {
+                var tokens = str.split(" ")
+                pubmoteJsY          = parseFloat(tokens[1])
+                pubmoteJsX          = parseFloat(tokens[2])
+                pubmoteBtC          = parseInt(tokens[3])
+                pubmoteBtZ          = parseInt(tokens[4])
+                pubmoteIsRev        = parseInt(tokens[5])
+                pubmoteBlinkerState = parseInt(tokens[6])
+                pubmoteClickCount   = parseInt(tokens[7])
+                pubmoteHornCount    = parseInt(tokens[8])
             } else if (str.startsWith("pubmote-info")) {
                 var tokens = str.split(" ");
                 var newVersion = "unknown";

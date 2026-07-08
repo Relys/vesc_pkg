@@ -14,6 +14,22 @@
 (def pubmote-version-minor 0)
 (def pubmote-version-patch 0)
 
+(def jsx-btn-seen-zero nil)
+(def jsx-btn-prev nil)
+(def jsx-click-count 0)
+(def jsx-last-release-time (systime))
+(def btn-horn-prev 0)
+(def bt-z-beep-start (systime))
+(def bt-z-beep-fired nil)
+
+(defunret mac-match (a b) {
+    (if (!= (length a) (length b)) (return nil))
+    (looprange i 0 (length a) {
+        (if (!= (ix a i) (ix b i)) (return nil))
+    })
+    (return t)
+})
+
 (def rem-cmds '(
     ; Remote version commands
     (REM_VERSION . 0)
@@ -147,7 +163,7 @@
 })
 
 (defun should-send-message () {
-    (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0))
+    (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= can-id 0))
 })
 
 (defun pubmote-loop () {
@@ -251,7 +267,7 @@
 })
 
 (defun should-process-message (src data) {
-    (and (= pairing-state 0) (eq esp-now-remote-mac src) (= (bufget-i32 data 1 'little-endian) (get-config 'esp-now-secret-code)))
+    (and (= pairing-state 0) (mac-match esp-now-remote-mac src) (= (bufget-i32 data 1 'little-endian) (get-config 'esp-now-secret-code)))
 })
 
 (defun reset-last-activity-time () {
@@ -326,17 +342,67 @@
                 (if (and (should-process-message src data) (= (buflen data) 17)) {
                     (reset-last-activity-time)
 
-                    ;(print (list "Received" src des data rssi))
                     (var jsy (bufget-f32 data 5 'little-endian))
                     (var jsx (bufget-f32 data 9 'little-endian))
                     (var bt-c (bufget-u8 data 13))
                     (var bt-z (bufget-u8 data 14))
                     (var is-rev (bufget-u8 data 15))
-                    ; (print (list jsy jsx bt-c bt-z is-rev))
-                    ; (rcode-run-noret (get-config 'can-id) `(set-remote-state ,jsy ,jsx ,bt-c ,bt-z ,is-rev))
 
-                    (if (>= (get-config 'can-id) 0) {
-                        (can-cmd (get-config 'can-id) (str-replace (to-str(list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
+                    (send-data (str-merge "pubmote-input "
+                        (str-from-n jsy "%.3f") " "
+                        (str-from-n jsx "%.3f") " "
+                        (str-from-n (if jsx-btn-seen-zero (if (< jsx 0) 1 0) 0)) " "
+                        (str-from-n (to-i bt-z)) " "
+                        (str-from-n (to-i is-rev)) " "
+                        (str-from-n blinker-state) " "
+                        (str-from-n jsx-click-count) " "
+                        (str-from-n horn-fire-count)))
+
+                    ; bt_z hold > 0.8s = horn
+                    (if (= bt-z 1) {
+                        (if (= btn-horn-prev 0) {
+                            (setq bt-z-beep-start (systime))
+                            (setq bt-z-beep-fired nil)
+                        })
+                        (if (and (not bt-z-beep-fired) (> (secs-since bt-z-beep-start) 0.8)) {
+                            (trigger-beep)
+                            (setq bt-z-beep-fired t)
+                        })
+                    }{
+                        (setq bt-z-beep-fired nil)
+                    })
+                    (setq btn-horn-prev bt-z)
+
+                    ; js_x X button click counter: 1=left blinker, 2=right blinker, 3+=horn
+                    ; jsx protocol: 0.0=not pressed, -1.0=pressed
+                    ; jsx-btn-seen-zero prevents false triggers if remote starts with jsx<0
+                    (if (>= jsx 0) (setq jsx-btn-seen-zero t))
+                    (if jsx-btn-seen-zero {
+                        (var btn-pressed (< jsx 0))
+                        (if (and btn-pressed (not jsx-btn-prev)) {
+                            (setq jsx-click-count (+ jsx-click-count 1))
+                            (setq jsx-last-release-time (systime))
+                        })
+                        (if (and (not btn-pressed) jsx-btn-prev) {
+                            (setq jsx-last-release-time (systime))
+                        })
+                        (setq jsx-btn-prev btn-pressed)
+
+                        (if (and (> jsx-click-count 0) (not btn-pressed)
+                                 (> (secs-since jsx-last-release-time) 0.4)) {
+                            (if (= jsx-click-count 1) {
+                                (set-blinker (if (= blinker-state (blinker-l)) 0 (blinker-l)))
+                            } (if (= jsx-click-count 2) {
+                                (set-blinker (if (= blinker-state (blinker-r)) 0 (blinker-r)))
+                            } {
+                                (if (>= can-id 0) (trigger-beep))
+                            }))
+                            (setq jsx-click-count 0)
+                        })
+                    })
+
+                    (if (and (>= can-id 0) (> (secs-since horn-last-start-time) 1.0)) {
+                        (can-cmd can-id (str-replace (to-str (list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
                     })
                 } {
                    (print "Conditions not met for set remote state")

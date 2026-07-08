@@ -30,7 +30,7 @@
 (def series-cells -1)
 (def refloat-humidity nil)
 (def soc-type 0)
-(def cell-type)
+(def cell-type 0)
 (def voltage-curve)
 
 (def FLOAT_MAGIC 101)
@@ -79,6 +79,19 @@
                 ; Reset the flag if more than 5 seconds have passed
                 (setq bms-charger-just-plugged nil)
             })
+        })
+
+        (if (and (= (get-config 'auto-blinker-enabled) 1) (>= can-id 0)) {
+            (var thresh (get-config 'auto-blinker-angle))
+            (if (> roll-angle thresh) {
+                (if (!= blinker-state (blinker-r)) (set-blinker (blinker-r)))
+                (setq blinker-flash-count 0)
+            } (if (< roll-angle (- 0 thresh)) {
+                (if (!= blinker-state (blinker-l)) (set-blinker (blinker-l)))
+                (setq blinker-flash-count 0)
+            } (if (< (abs roll-angle) (* thresh 0.8))
+                (if (!= blinker-state 0) (set-blinker 0))
+            )))
         })
 
         (setq loop-end-time (secs-since 0))

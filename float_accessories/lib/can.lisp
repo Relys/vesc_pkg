@@ -32,6 +32,8 @@
 (def soc-type 0)
 (def cell-type)
 (def voltage-curve)
+(def need-fetch-cells nil)
+(def last-fetch-cells-time 0)
 
 (def FLOAT_MAGIC 101)
 (def FLOAT_ACCESSORIES_MAGIC 102)
@@ -83,6 +85,14 @@
 
         (setq loop-end-time (secs-since 0))
         (var actual-loop-time (- loop-end-time loop-start-time))
+
+        (if need-fetch-cells {
+            (setq need-fetch-cells nil)
+            (setq last-fetch-cells-time (secs-since 0))
+            (fetch-series-cells)
+            (apply-battery-config (get-config 'soc-type) (get-config 'cell-type))
+        })
+
         (var time-to-wait (- next-run-time (secs-since 0)))
         (if (> time-to-wait 0) {
             (yield (* time-to-wait 1000000))
@@ -220,98 +230,101 @@
     (send-data (append (list FLOAT_MAGIC) cmd) 2 can-id)
 })
 
-(defun float-command-rx (data) {
-    ;(print-hex data)
-    ;Support for saving config/code exec from qml
-    (if (and (> (buflen data) 1) (= (bufget-u8 data 0) FLOAT_ACCESSORIES_MAGIC)) {
-        (match (cossa float-accessories-cmds (bufget-u8 data 1))
-            ;(COMMAND_GET_INFO {
-            ;})
-            (COMMAND_RUN_LISP {
-                (bufcpy data 0 data 2 (-(buflen data) 2))
-                (buf-resize data -2)
-                (eval (read data))
-            })
-            (COMMAND_BMS_STATUS {
-                (var send-buffer (bufcreate 3))
-                (bufset-u8 send-buffer 0 FLOAT_ACCESSORIES_MAGIC)
-                (bufset-u8 send-buffer 1 (assoc 'COMMAND_BMS_STATUS float-accessories-cmds))
-                (bufset-u8 send-buffer 2 bms-status)
-                (send-data send-buffer 2 can-id)
-                (free send-buffer)
-            })
-            (_ nil) ; Ignore other commands
-        )
-    })
+(defun float-accessories-command-rx (data) {
+    (match (cossa float-accessories-cmds (bufget-u8 data 1))
+        ;(COMMAND_GET_INFO {
+        ;})
+        (COMMAND_RUN_LISP {
+            (var payload-len (- (buflen data) 2))
+            (var payload (bufcreate payload-len))
+            (bufcpy payload 0 data 2 payload-len)
+            (eval (read payload))
+            (free payload)
+        })
+        (COMMAND_BMS_STATUS {
+            (var send-buffer (bufcreate 3))
+            (bufset-u8 send-buffer 0 FLOAT_ACCESSORIES_MAGIC)
+            (bufset-u8 send-buffer 1 (assoc 'COMMAND_BMS_STATUS float-accessories-cmds))
+            (bufset-u8 send-buffer 2 bms-status)
+            (send-data send-buffer 2 can-id)
+            (free send-buffer)
+        })
+        (_ nil) ; Ignore other commands
+    )
+})
 
-    ; Only process data if data is long enough and magic number is correct
-    (if (and (> (buflen data) 1) (= (bufget-u8 data 0) FLOAT_MAGIC)) {
-        (setq can-last-activity-time (systime))
-        (match (cossa float-cmds (bufget-u8 data 1))
-                (COMMAND_GET_ALLDATA {
-                (if (< can-id 0){
-                    (set-config 'can-id discover-can-id)
-                    (setq can-id discover-can-id)
-                    (setq bms-can-id (get-bms-val 'bms-can-id))
+(defun float-pkg-telemetry-rx (data) {
+    (var time-since-last-can (- (systime) can-last-activity-time))
+    (setq can-last-activity-time (systime))
+    (match (cossa float-cmds (bufget-u8 data 1))
+        (COMMAND_GET_ALLDATA {
+            (if (or (< can-id 0) (> time-since-last-can 5000000)) {
+                (set-config 'can-id discover-can-id)
+                (setq can-id discover-can-id)
+                (setq bms-can-id (get-bms-val 'bms-can-id))
+                ; Only re-fetch if cells aren't already known and we haven't tried recently
+                (if (and (< series-cells 1) (> (secs-since last-fetch-cells-time) 10)) {
+                    (setq need-fetch-cells t)
                 })
-                    (if  (> (buflen data) 3){
-                        (var mode (bufget-u8 data 2))
+            })
+            (if  (> (buflen data) 3){
+                (var mode (bufget-u8 data 2))
 
-                        (if (= mode 69) {
-                            (setq fault-code (bufget-u8 data 3))
-                        }{
-                            (setq fault-code 0)
-                            (if (>= (buflen data) 32) {
-                                (setq roll-angle (/ (to-float (bufget-i16 data 7)) 10))
-                                (var state-byte (bufget-u8 data 9))
-                                (setq state (bitwise-and state-byte 0x0F))
-                                (setq sat-t (shr state-byte 4))
-                                (var switch-state-byte (bufget-u8 data 10))
-                                (setq switch-state (bitwise-and switch-state-byte 0x07))
-                                ;(var beep-reason-t (shr switch-state-byte 4))
-                                (setq handtest-mode (= (bitwise-and switch-state-byte 0x08) 0x08))
-                                (setq footpad-adc1-t (/ (to-float (bufget-u8 data 11)) 50))
-                                (setq footpad-adc2-t (/ (to-float (bufget-u8 data 12)) 50))
-                                (if (= switch-state 2) {
-                                    (setq switch-state 3)
-                                })
-                                (if (= switch-state 1) {
-                                    (if (> footpad-adc2-t footpad-adc1-t) {
-                                        (setq switch-state 2)
-                                    })
-                                })
-                                (setq pitch-angle (/ (to-float (bufget-i16 data 19)) 10))
-                                (setq vin (/ (to-float (bufget-i16 data 22)) 10))
-                                (if (= soc-type 1) { ; Use voltage curve
-                                    (setq battery-percent-remaining (/ (estimate-soc (/ vin series-cells) voltage-curve) 100))
-                                })
-                                (setq rpm (/ (to-float  (bufget-i16 data 24)) 10))
-                                (setq speed (/ (to-float (bufget-i16 data 26)) 10))
-                                (setq tot-current (/ (to-float (bufget-i16 data 28)) 10))
-                                (setq bat-current (/ (to-float (bufget-i16 data 30)) 10))
-                                (setq duty-cycle-now (/ (to-float (- (bufget-u8 data 32) 128)) 100))
-                                (if (>= mode 2) {
-                                    (setq distance-abs (bufget-f32 data 34))
-                                    (setq fet-temp-filtered (/ (bufget-u8 data 38) 2.0))
-                                    (setq motor-temp-filtered (/ (bufget-u8 data 39) 2.0))
-                                })
-                                (if (>= mode 3) {
-                                    (setq odometer (bufget-u32 data 41))
-                                    
-                                    (if (= soc-type 0) { ; Ignore if using custom curves
-                                        (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 200))
-                                    })
-                                })
+                (if (= mode 69) {
+                    (setq fault-code (bufget-u8 data 3))
+                }{
+                    (setq fault-code 0)
+                    (if (>= (buflen data) 32) {
+                        (setq roll-angle (/ (to-float (bufget-i16 data 7)) 10))
+                        (var state-byte (bufget-u8 data 9))
+                        (setq state (bitwise-and state-byte 0x0F))
+                        (setq sat-t (shr state-byte 4))
+                        (var switch-state-byte (bufget-u8 data 10))
+                        (setq switch-state (bitwise-and switch-state-byte 0x07))
+                        ;(var beep-reason-t (shr switch-state-byte 4))
+                        (setq handtest-mode (= (bitwise-and switch-state-byte 0x08) 0x08))
+                        (setq footpad-adc1-t (/ (to-float (bufget-u8 data 11)) 50))
+                        (setq footpad-adc2-t (/ (to-float (bufget-u8 data 12)) 50))
+                        (if (= switch-state 2) {
+                            (setq switch-state 3)
+                        })
+                        (if (= switch-state 1) {
+                            (if (> footpad-adc2-t footpad-adc1-t) {
+                                (setq switch-state 2)
+                            })
+                        })
+                        (setq pitch-angle (/ (to-float (bufget-i16 data 19)) 10))
+                        (setq vin (/ (to-float (bufget-i16 data 22)) 10))
+                        (if (= soc-type 1) { ; Use voltage curve
+                            (setq battery-percent-remaining (/ (estimate-soc (/ vin series-cells) voltage-curve) 100))
+                        })
+                        (setq rpm (/ (to-float  (bufget-i16 data 24)) 10))
+                        (setq speed (/ (to-float (bufget-i16 data 26)) 10))
+                        (setq tot-current (/ (to-float (bufget-i16 data 28)) 10))
+                        (setq bat-current (/ (to-float (bufget-i16 data 30)) 10))
+                        (setq duty-cycle-now (/ (to-float (- (bufget-u8 data 32) 128)) 100))
+                        (if (>= mode 2) {
+                            (setq distance-abs (bufget-f32 data 34))
+                            (setq fet-temp-filtered (/ (bufget-u8 data 38) 2.0))
+                            (setq motor-temp-filtered (/ (bufget-u8 data 39) 2.0))
+                        })
+                        (if (>= mode 3) {
+                            (setq odometer (bufget-u32 data 41))
+                            
+                            (if (= soc-type 0) { ; Ignore if using custom curves
+                                (setq battery-percent-remaining (/ (to-float (bufget-u8 data 53)) 200))
                             })
                         })
                     })
                 })
-                (COMMAND_HUMIDITY {
-                    (setq refloat-humidity t)
-                    ;(print "Refloat Humidity supported")
-                })
-                (_ nil)
-            )
-    })
+            })
+        })
+        (COMMAND_HUMIDITY {
+            (setq refloat-humidity t)
+            ;(print "Refloat Humidity supported")
+        })
+        (_ nil)
+    )
 })
 @const-end
+

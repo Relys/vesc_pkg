@@ -2,6 +2,7 @@ import "qrc:/mobile"
 import QtQuick 2.12
 import QtQuick.Controls 2.12
 import QtQuick.Layouts 1.3
+import QtQuick.Controls.Material 2.2
 import Vedder.vesc.commands 1.0
 import Vedder.vesc.configparams 1.0
 import Vedder.vesc.utility 1.0
@@ -19,6 +20,13 @@ Item {
             value: 50
             property bool asPercent: false
             property bool hideBubble: true
+            signal interactionReleased()
+
+            onPressedChanged: {
+                if (!pressed) {
+                    interactionReleased()
+                }
+            }
             property var formatValue: function(val) { 
                 if (asPercent) {
                     let percentage = ((val - from) / (to - from)) * 100;
@@ -57,26 +65,195 @@ Item {
         }
     }
 
+    // Shared card styling values
+    QtObject {
+        id: cardStyle
+        property int topPadding: 42
+        property int sidePadding: 12
+        property int bottomPadding: 12
+        property int contentSpacing: 6
+        property int titleHeight: 40
+        property int radius: 15
+        // Spacing constants
+        property int betweenCards: 20   // gap between GroupBox cards
+        property int fieldSpacing: 10   // gap between label+control pairs in a card
+        property int labelSpacing: 2    // gap between a label and its control
+        // ScrollView padding
+        property int scrollHPadding: 12  // left/right padding inside scrollviews
+        property int scrollTopPadding: 16
+        property int scrollBottomPadding: 16
+        // ScrollView background
+        property color scrollViewBg: Utility.getAppHexColor("darkBackground")
+    }
+
+    // Shared field label styling (used for labels that sit above a control)
+    QtObject {
+        id: fieldLabelStyle
+        property color color: Qt.rgba(1, 1, 1, 0.75)
+        property int pixelSize: 13
+        property bool bold: false
+    }
+
+    Component {
+        id: cardBg
+        Rectangle {
+            color: Qt.rgba(1, 1, 1, 0.06)
+            radius: cardStyle.radius
+        }
+    }
+
+    // Reusable card component with title and optional titleRight content
+    // Usage: Loader { sourceComponent: card; onLoaded: { item.title = "Title"; item.titleRight = someComponent } }
+    Component {
+        id: card
+        Rectangle {
+            property string title: ""
+            property Component titleRight: null
+            default property alias content: contentColumn.children
+
+            Layout.fillWidth: true
+            radius: 15
+            color: Qt.rgba(1, 1, 1, 0.06)
+            implicitHeight: cardInner.implicitHeight + 24
+
+            ColumnLayout {
+                id: cardInner
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 12
+                spacing: 10
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 2
+                    visible: title !== ""
+
+                    Text {
+                        text: title
+                        color: "white"
+                        font.pixelSize: 15
+                        font.bold: true
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                    Item { Layout.fillWidth: true }
+                    Loader {
+                        id: titleRightLoader
+                        sourceComponent: titleRight
+                        Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+                        visible: titleRight !== null
+                    }
+                }
+
+                ColumnLayout {
+                    id: contentColumn
+                    Layout.fillWidth: true
+                    spacing: 10
+                }
+            }
+        }
+    }
+
+    // Card title for GroupBox label
+    Component {
+        id: cardTitleLabel
+        Item {
+            property string title: ""
+            implicitHeight: 40
+            implicitWidth: parent ? parent.width : 200
+
+            Text {
+                id: titleText
+                text: parent.title
+                color: "white"
+                font.bold: true
+                font.pixelSize: 15
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+    }
+
+    // Card title with right content for GroupBox label
+    Component {
+        id: cardTitleWithRight
+        Item {
+            property string title: ""
+            default property alias titleRight: titleRightRow.children
+            implicitHeight: 40
+            implicitWidth: parent ? parent.width : 200
+
+            Text {
+                text: parent.title
+                color: "white"
+                font.bold: true
+                font.pixelSize: 15
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Row {
+                id: titleRightRow
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+            }
+        }
+    }
+
+    Component {
+        id: customSwitch
+        Switch {
+            id: control
+            padding: 0
+            indicator: Rectangle {
+                implicitWidth: 48
+                implicitHeight: 26
+                x: control.leftPadding
+                y: parent.height / 2 - height / 2
+                radius: 13
+                color: control.checked ? Material.accent : palette.button
+                border.color: control.checked ? Material.accent : palette.button
+                
+                Rectangle {
+                    x: control.checked ? parent.width - width - 2 : 2
+                    y: 2
+                    width: 22
+                    height: 22
+                    radius: 11
+                    color: "white"
+                    Behavior on x {
+                        NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+                    }
+                }
+            }
+        }
+    }
+
     // Main app
     id: container
+    property string tabTitle: "Float Accessories"  
     anchors.fill: parent
-    anchors.margins: 10
     property int pubmotePairCode: -1  // Initialize with a default invalid value
+    property int pubmotePairingState: 0
     property bool pairingTimeout: false
-    property int remainingTime: 30  // Initialize with the full 30 seconds
+    property int remainingTime: 60  // Initialize with the full 60 seconds
     property int bmsConnected: 0
     property Commands mCommands: VescIf.commands()
     property int floatAccessoriesMagic: 102
     property bool acceptTOS: false
     property int lastStatusTime: 0
-    property bool statusTimeout: false
+    property bool statusTimeout: true
     property bool readConfig: false
     property bool wasConnected: false
     property int floatPackageLastStatusTime: 0
     property int pubmoteLastStatusTime: 0
-    property int floatPackageConnected: 0
-    property int pubmoteConnected: 0
+    property bool floatPackageConnected: false
+    property bool pubmoteConnected: false
     property int pubmoteWifiChannel: 0
+    property bool isPubmoteBle: false
     property bool isPubmotePaired: false
     property int bmsStatusTemp: 0
     property int bmsBatteryTypeVal: 0
@@ -87,6 +264,14 @@ Item {
     property real bmsHumTemp: 0
     property int loggerRunning: 0
     property string pubmoteVersionStr: "Unknown"
+
+    // Live remote input preview state
+    property bool pubmoteInputConnected: false
+    property real pubmoteInputJsy: 0
+    property real pubmoteInputJsx: 0
+    property bool pubmoteInputBtC: false
+    property bool pubmoteInputBtZ: false
+    property bool pubmoteInputRev: false
 
     Component.onCompleted: {
         if (VescIf.getLastFwRxParams().hwTypeStr() !== "Custom Module") {
@@ -116,7 +301,18 @@ Item {
         }
     }
 
-    // Timer for 30-second timeout
+    // Polls the remote's input state while the preview section is visible and toggled on
+    Timer {
+        id: inputPreviewTimer
+        interval: 100 // 10 Hz
+        repeat: true
+        running: inputPreviewSection.visible && inputPreviewEnabled.checked
+        onTriggered: {
+            sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(input-state)")
+        }
+    }
+
+    // Timer for 60-second timeout
     Timer {
         id: pairingTimeoutTimer
         interval: 1000  // 1 second
@@ -129,6 +325,7 @@ Item {
             if (remainingTime <= 0) {
                 pairingTimeout = true;
                 sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -2)");  // Automatically reject if time runs out
+                sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)");
                 pubmotePairPopup.close();
             }
         }
@@ -168,10 +365,11 @@ Item {
 
         onVisibleChanged: {
             if (visible) {
+                pubmotePairingState = 1;
                 // Generate code only when the popup is shown
                 pubmotePairCode = Math.floor(1000 + Math.random() * 9000);  // Generates a number between 1000 and 9999
                 pairingTimeout = false;  // Reset timeout flag
-                remainingTime = 30;  // Reset the timer to 30 seconds
+                remainingTime = 60;  // Reset the timer to 60 seconds
                 pairingTimeoutTimer.start();  // Start the 1-second timer to count down
 
                 // Send the pairing request with the generated code
@@ -205,6 +403,14 @@ Item {
                 Layout.alignment: Qt.AlignHCenter
             }
 
+            Text {
+                text: pubmotePairingState === 1 ? "Searching for remote..." :
+                      pubmotePairingState === 2 ? "Remote found! Confirm code and Accept." :
+                      "Pairing..."
+                color: "cyan"
+                Layout.alignment: Qt.AlignHCenter
+            }
+
             RowLayout {
                 spacing: 10
                 Layout.alignment: Qt.AlignHCenter
@@ -214,6 +420,7 @@ Item {
                     onClicked: {
                         if (!pairingTimeout) {
                             sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -1)");  // Accept pairing
+                            sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)");
                             pubmotePairPopup.close();
                         }
                     }
@@ -223,6 +430,7 @@ Item {
                     text: "Reject"
                     onClicked: {
                         sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -2)");  // Reject pairing manually
+                        sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)");
                         pubmotePairPopup.close();
                     }
                 }
@@ -320,6 +528,7 @@ Item {
                 ScrollView {
                     clip: true
                     width: parent.width
+                    background: Rectangle { color: cardStyle.scrollViewBg }
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                     TextArea {
@@ -385,11 +594,63 @@ Item {
         property string primaryTabLabel: ledEnabled.checked || bmsEnabled.checked || logEnabled.checked ? qsTr("Control") : qsTr("Status")
         property int enabledFeatureCount: ledEnabled.checked + pubmoteEnabled.checked + bmsEnabled.checked + logEnabled.checked
 
+        onEnabledFeatureCountChanged: {
+            if (enabledFeatureCount === 0 && tabBar.currentIndex === 1) {
+                tabBar.currentIndex = 0
+            }
+        }
+
         Text {
             Layout.alignment: Qt.AlignHCenter
             color: Utility.getAppHexColor("lightText")
             font.pointSize: 20
+            font.bold: true
             text: "Float Accessories"
+            topPadding: 10
+            leftPadding: 10
+            rightPadding: 10
+        }
+
+        // Config menu for selecting which config to show
+        Menu {
+            id: configMenu
+
+            MenuItem {
+                text: qsTr("Lights")
+                visible: ledEnabled.checked
+                height: visible ? implicitHeight : 0
+                onTriggered: {
+                    tabBar2.currentIndex = 0
+                    tabBar.currentIndex = 1
+                }
+            }
+            MenuItem {
+                text: qsTr("Pubmote")
+                visible: pubmoteEnabled.checked
+                height: visible ? implicitHeight : 0
+                onTriggered: {
+                    tabBar2.currentIndex = 1
+                    tabBar.currentIndex = 1
+                }
+            }
+            MenuItem {
+                text: qsTr("BMS")
+                visible: bmsEnabled.checked
+                height: visible ? implicitHeight : 0
+                onTriggered: {
+                    tabBar2.currentIndex = 2
+                    tabBar.currentIndex = 1
+                }
+            }
+            MenuItem {
+                text: qsTr("Logging")
+                visible: logEnabled.checked
+                height: visible ? implicitHeight : 0
+                onTriggered: {
+                    tabBar2.currentIndex = 3
+                    tabBar.currentIndex = 1
+                }
+            }
         }
 
         TabBar {
@@ -397,29 +658,118 @@ Item {
             Layout.fillWidth: true
 
             TabButton {
+                id: primaryTabButton
                 text: mainLayout.primaryTabLabel
+                font.capitalization: Font.MixedCase
+                Layout.fillWidth: true
+                contentItem: Text {
+                    text: primaryTabButton.text
+                    font: primaryTabButton.font
+                    color: primaryTabButton.checked ? "white" : Qt.rgba(1, 1, 1, 0.54)
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             TabButton {
+                id: configTabButton
                 text: qsTr("Config")
+                font.capitalization: Font.MixedCase
                 enabled: mainLayout.enabledFeatureCount > 0
                 visible: mainLayout.enabledFeatureCount > 0
-                width: mainLayout.enabledFeatureCount > 0 ? implicitWidth : 0
+                Layout.fillWidth: true
+                Layout.maximumWidth: mainLayout.enabledFeatureCount > 0 ? Number.POSITIVE_INFINITY : 0
+                width: mainLayout.enabledFeatureCount > 0 ? undefined : 0
+
+                contentItem: Item {
+                    implicitWidth: labelText.implicitWidth + (chevronCanvas.visible ? chevronCanvas.width + 4 : 0)
+                    implicitHeight: labelText.implicitHeight
+
+                    property color textColor: configTabButton.checked ? "white" : Qt.rgba(1, 1, 1, 0.54)
+
+                    Text {
+                        id: labelText
+                        text: qsTr("Config")
+                        font: configTabButton.font
+                        color: parent.textColor
+                        anchors.centerIn: parent
+                        anchors.horizontalCenterOffset: chevronCanvas.visible ? -(chevronCanvas.width + 4) / 2 : 0
+                    }
+
+                    Canvas {
+                        id: chevronCanvas
+                        width: 14
+                        height: 14
+                        visible: mainLayout.enabledFeatureCount > 1
+                        anchors.left: labelText.right
+                        anchors.leftMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        property color strokeColor: parent.textColor
+                        onStrokeColorChanged: requestPaint()
+
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
+                            ctx.strokeStyle = strokeColor
+                            ctx.lineWidth = 1.5
+                            ctx.lineCap = "round"
+                            ctx.lineJoin = "round"
+                            var s = 14 / 24
+                            ctx.beginPath()
+                            ctx.moveTo(6 * s, 9 * s)
+                            ctx.lineTo(12 * s, 15 * s)
+                            ctx.lineTo(18 * s, 9 * s)
+                            ctx.stroke()
+                        }
+                    }
+                }
+
+                onClicked: {
+                    if (mainLayout.enabledFeatureCount > 1) {
+                        configMenu.popup(configTabButton, 0, configTabButton.height)
+                    } else {
+                        if (ledEnabled.checked) tabBar2.currentIndex = 0
+                        else if (pubmoteEnabled.checked) tabBar2.currentIndex = 1
+                        else if (bmsEnabled.checked) tabBar2.currentIndex = 2
+                        else if (logEnabled.checked) tabBar2.currentIndex = 3
+                    }
+                }
             }
 
             TabButton {
+                id: settingsTabButton
                 text: qsTr("Settings")
+                font.capitalization: Font.MixedCase
+                Layout.fillWidth: true
+                contentItem: Text {
+                    text: settingsTabButton.text
+                    font: settingsTabButton.font
+                    color: settingsTabButton.checked ? "white" : Qt.rgba(1, 1, 1, 0.54)
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             TabButton {
+                id: aboutTabButton
                 text: qsTr("About")
+                font.capitalization: Font.MixedCase
+                Layout.fillWidth: true
+                contentItem: Text {
+                    text: aboutTabButton.text
+                    font: aboutTabButton.font
+                    color: aboutTabButton.checked ? "white" : Qt.rgba(1, 1, 1, 0.54)
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
         }
 
         TabBar {
             id: tabBar2
             Layout.fillWidth: true
-            visible: tabBar.currentIndex === 1 && mainLayout.enabledFeatureCount > 1
+            visible: false  // Hidden - using menu instead
 
             // Update enabled indices when checkboxes change
             Component.onCompleted: updateEnabledIndices()
@@ -440,7 +790,7 @@ Item {
             }
 
             TabButton {
-                text: qsTr("LED")
+                text: qsTr("Lights")
                 enabled: ledEnabled.checked
                 visible: ledEnabled.checked
                 width: ledEnabled.checked ? implicitWidth : 0
@@ -478,45 +828,79 @@ Item {
             ScrollView {
                 clip: true
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                background: Rectangle { color: cardStyle.scrollViewBg }
 
-                ColumnLayout {
+                Item {
                     width: stackLayout.width
-                    spacing: 10
+                    implicitHeight: scrollContent1.implicitHeight + cardStyle.scrollTopPadding + cardStyle.scrollBottomPadding
+
+                    ColumnLayout {
+                        id: scrollContent1
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.topMargin: cardStyle.scrollTopPadding
+                        anchors.leftMargin: cardStyle.scrollHPadding
+                        anchors.rightMargin: cardStyle.scrollHPadding
+                        spacing: 20
 
                     Timer {
-                        id: debounceTimer
-                        interval: 500  // Half a second (500ms)
+                        id: throttleTimer
+                        interval: 50  // 50ms throttle timer
                         repeat: false
+                        property bool controlPending: false
                         onTriggered: {
-                            applyControlChanges()
+                            if (controlPending) {
+                                applyControlChanges()
+                                controlPending = false
+                            }
                         }
                     }
 
-                    // Stack Layout
-                    StackLayout {
-                        id: stackLayout2
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        currentIndex: tabBar2.currentIndex
-                    }
-
                     GroupBox {
-                        title: "LED Control"
+                        title: "Light Control"
                         Layout.fillWidth: true
                         visible: ledEnabled.checked
+                        background: Loader { sourceComponent: cardBg }
+                        label: Item {
+                            implicitHeight: 40
+                            width: parent ? parent.width : 200
+
+                            Text {
+                                text: "Light Control"
+                                color: "white"
+                                font.bold: true
+                                font.pixelSize: 15
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Loader {
+                                id: ledOn
+                                sourceComponent: customSwitch
+                                anchors.right: parent.right
+                                anchors.rightMargin: cardStyle.sidePadding
+                                anchors.verticalCenter: parent.verticalCenter
+                                property bool checked: item ? item.checked : false
+
+                                onLoaded: {
+                                    item.checked = true
+                                    item.checkedChanged.connect(function() {
+                                        ledOn.checked = item.checked
+                                        handleDebouncedChange()
+                                    })
+                                }
+
+                                onCheckedChanged: {
+                                    if (item) item.checked = checked
+                                }
+                            }
+                        }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: 10
-
-                            CheckBox {
-                                id: ledOn
-                                text: "LEDs On"
-                                checked: true
-                                onCheckedChanged: {
-                                    handleDebouncedChange()
-                                }
-                            }
+                            spacing: 6
 
                             ColumnLayout {
                                 id: ledHighBeamLayout
@@ -559,59 +943,23 @@ Item {
 
                             ColumnLayout {
                                 id: ledOnLayout
-                                visible: ledOn.checked
+                                visible: true
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Brightness"
-                                }
-
-                                Loader {
-                                    id: ledBrightnessLoader
-                                    sourceComponent: customValueSlider
-                                    onLoaded: {
-                                        item.from = 0.0
-                                        item.to = 1.0
-                                        item.value = 0.6
-                                        item.asPercent = true
-                                        item.valueChanged.connect(function() {
-                                                handleDebouncedChange()
-                                        })
-                                    }
-                                }
-
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Idle Brightness"
-                                }
-
-                                Loader {
-                                    id: ledBrightnessIdleLoader
-                                    sourceComponent: customValueSlider
-                                    onLoaded: {
-                                        item.from = 0.0
-                                        item.to = 1.0
-                                        item.value = 0.3
-                                        item.asPercent = true
-                                        item.valueChanged.connect(function() {
-                                                handleDebouncedChange()
-                                        })
-                                    }
-                                }
-
                                 ColumnLayout {
-                                    id: ledStatusBrightnessLayout
-                                    visible: ledStatusStripType.currentValue > 0 || ledMallGrabEnabled.checked
-                                    spacing: 10
-
+                                    spacing: cardStyle.labelSpacing
+                                    Layout.fillWidth: true
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: ledMallGrabEnabled.checked && ledStatusStripType.currentValue > 0 ? "Status/Mall Grab Brightness" : ledMallGrabEnabled.checked ? "Mall Grab Brightness" : "Status Brightness"
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Brightness"
+                                        opacity: ledOn.checked ? 1.0 : 0.4
                                     }
-
                                     Loader {
-                                        id: ledBrightnessStatusLoader
+                                        id: ledBrightnessLoader
+                                        enabled: ledOn.checked
+                                        opacity: ledOn.checked ? 1.0 : 0.4
                                         sourceComponent: customValueSlider
                                         onLoaded: {
                                             item.from = 0.0
@@ -620,6 +968,72 @@ Item {
                                             item.asPercent = true
                                             item.valueChanged.connect(function() {
                                                     handleDebouncedChange()
+                                            })
+                                            item.interactionReleased.connect(function() {
+                                                    flushControlChanges()
+                                            })
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Layout.fillWidth: true
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Idle Brightness"
+                                        opacity: ledOn.checked ? 1.0 : 0.4
+                                    }
+                                    Loader {
+                                        id: ledBrightnessIdleLoader
+                                        enabled: ledOn.checked
+                                        opacity: ledOn.checked ? 1.0 : 0.4
+                                        sourceComponent: customValueSlider
+                                        onLoaded: {
+                                            item.from = 0.0
+                                            item.to = 1.0
+                                            item.value = 0.3
+                                            item.asPercent = true
+                                            item.valueChanged.connect(function() {
+                                                    handleDebouncedChange()
+                                            })
+                                            item.interactionReleased.connect(function() {
+                                                    flushControlChanges()
+                                            })
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    id: ledStatusBrightnessLayout
+                                    visible: ledStatusStripType.currentValue > 0 || ledMallGrabEnabled.checked
+                                    spacing: cardStyle.labelSpacing
+
+                                    Text {
+                                        opacity: ledOn.checked ? 1.0 : 0.4
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: ledMallGrabEnabled.checked && ledStatusStripType.currentValue > 0 ? "Status/Mall Grab Brightness" : ledMallGrabEnabled.checked ? "Mall Grab Brightness" : "Status Brightness"
+                                    }
+
+                                    Loader {
+                                        id: ledBrightnessStatusLoader
+                                        enabled: ledOn.checked
+                                        opacity: ledOn.checked ? 1.0 : 0.4
+                                        sourceComponent: customValueSlider
+                                        onLoaded: {
+                                            item.from = 0.0
+                                            item.to = 1.0
+                                            item.value = 0.6
+                                            item.asPercent = true
+                                            item.valueChanged.connect(function() {
+                                                    handleDebouncedChange()
+                                            })
+                                            item.interactionReleased.connect(function() {
+                                                    flushControlChanges()
                                             })
                                         }
                                     }
@@ -636,15 +1050,18 @@ Item {
                                         || ledRearStripType.currentIndex === 7
                                     )
                                 )
-                                spacing: 10
+                                spacing: 2
 
                                 Text {
-                                    color: Utility.getAppHexColor("lightText")
+                                    color: fieldLabelStyle.color
+                                    font.pixelSize: fieldLabelStyle.pixelSize
+                                    font.bold: fieldLabelStyle.bold
                                     text: "Highbeam Brightness"
                                 }
 
                                 Loader {
                                     id: ledBrightnessHighbeamLoader
+                                    Layout.topMargin: -9
                                     sourceComponent: customValueSlider
                                     onLoaded: {
                                         item.from = 0.0
@@ -653,6 +1070,9 @@ Item {
                                         item.asPercent = true
                                         item.valueChanged.connect(function() {
                                                 handleDebouncedChange()
+                                        })
+                                        item.interactionReleased.connect(function() {
+                                                flushControlChanges()
                                         })
                                     }
                                 }
@@ -664,10 +1084,13 @@ Item {
                         title: "Logging Control"
                         Layout.fillWidth: true
                         visible: logEnabled.checked
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Logging Control" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: 10
+                            spacing: 6
 
                             Text {
                                 id: loggerStatus
@@ -682,7 +1105,7 @@ Item {
                                 Layout.preferredWidth: 500
                                 visible: !statusTimeout && !loggerRunning
                                 text: "Start Logging"
-                            
+
                                 onClicked: {
                                     sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(start-log (get-config 'log-append-gnss) (get-config 'log-rate))");
                                 }
@@ -693,7 +1116,7 @@ Item {
                                 Layout.preferredWidth: 500
                                 visible: !statusTimeout && loggerRunning
                                 text: "Stop Logging"
-                            
+
                                 onClicked: {
                                     sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(stop-log)");
                                 }
@@ -705,10 +1128,13 @@ Item {
                         title: "BMS Control"
                         Layout.fillWidth: true
                         visible: bmsEnabled.checked && bmsType.currentIndex > 1
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "BMS Control" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: 10
+                            spacing: 6
 
                             Switch {
                                 id: bmsChargeState
@@ -725,10 +1151,13 @@ Item {
                     GroupBox {
                         title: "Status"
                         Layout.fillWidth: true
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Status" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: 10
+                            spacing: 6
 
                             // Status Texts Column
                             Text {
@@ -742,8 +1171,8 @@ Item {
                                 id: floatPackageStatus
                                 Layout.fillWidth: true
                                 property int effectiveTime: Math.max(floatPackageLastStatusTime, lastStatusTime)
-                                color: (floatPackageConnected === 1 && !statusTimeout) ? "green" : (effectiveTime <= 60 ? "yellow" : "red")
-                                text: (floatPackageConnected === 1 && !statusTimeout) ? "Float Package Status: Connected" : (effectiveTime <= 60 ? "Float Package Status: Connecting (" + effectiveTime + "s)" : "Float Package Status: Disconnected (" + effectiveTime + "s)")
+                                color: (floatPackageConnected && !statusTimeout) ? "green" : (effectiveTime <= 60 ? "yellow" : "red")
+                                text: (floatPackageConnected && !statusTimeout) ? "Float Package: Connected" : (effectiveTime <= 60 ? "Float Package: Connecting (" + effectiveTime + "s)" : "Float Package: Disconnected (" + effectiveTime + "s)")
                             }
 
                             Text {
@@ -751,15 +1180,15 @@ Item {
                                 Layout.fillWidth: true
                                 visible: pubmoteEnabled.checked
                                 property int effectiveTime: Math.max(pubmoteLastStatusTime, lastStatusTime)
-                                color: !isPubmotePaired ? Utility.getAppHexColor("lightText") : ((pubmoteConnected === 1 && !statusTimeout) ? "green" : (effectiveTime <= 60 ? "yellow" : "red"))
-                                text: !isPubmotePaired ? "Pubmote Status: Not Paired" : ("Pubmote Status: " + ((pubmoteConnected === 1 && !statusTimeout) ? "Connected (WiFi Channel " + (pubmoteWifiChannel ? pubmoteWifiChannel : "?") + ")" : (effectiveTime <= 60 ? "Connecting (" + effectiveTime + "s)" : "Disconnected (" + effectiveTime + "s)")))
+                                color: !isPubmotePaired ? Utility.getAppHexColor("lightText") : ((pubmoteConnected && !statusTimeout) ? "green" : (effectiveTime <= 60 ? "yellow" : "red"))
+                                text: !isPubmotePaired ? "Pubmote: Not Paired" : ("Pubmote : " + ((pubmoteConnected && !statusTimeout) ? (isPubmoteBle ? "Connected (BLE)" : "Connected (WiFi Channel " + (pubmoteWifiChannel ? pubmoteWifiChannel : "?") + ")") : (effectiveTime <= 60 ? "Connecting (" + effectiveTime + "s)" : "Disconnected (" + effectiveTime + "s)")))
                             }
 
                             Text {
                                 id: bmsStatus
                                 Layout.fillWidth: true
                                 color: (!statusTimeout && bmsConnected) ? "green" : "red"
-                                text: statusTimeout ? "BMS Status: Unknown" : "BMS Status: " + (bmsConnected ? "Connected" : "Not Connected")
+                                text: statusTimeout ? "BMS: Unknown" : "BMS: " + (bmsConnected ? "Connected" : "Not Connected")
                                 visible: bmsEnabled.checked
                             }
                             Text {
@@ -797,10 +1226,13 @@ Item {
                         title: "BMS Info"
                         Layout.fillWidth: true
                         visible: bmsEnabled.checked && bmsConnected === 1
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "BMS Info" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: 10
+                            spacing: 6
 
                             Text {
                                 id: bmsError
@@ -822,6 +1254,7 @@ Item {
                             }
                         }
                     }
+                    }
                 }
             }
 
@@ -829,63 +1262,88 @@ Item {
             ScrollView {
                 clip: true
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                background: Rectangle { color: cardStyle.scrollViewBg }
 
-                ColumnLayout {
+                Item {
                     width: stackLayout.width
+                    implicitHeight: scrollContent2.implicitHeight + cardStyle.scrollTopPadding + cardStyle.scrollBottomPadding
 
                     ColumnLayout {
-                        id: ledEnabledLayout
-                        visible: ledEnabled.checked && tabBar2.currentIndex === 0
-                        spacing: 10
+                        id: scrollContent2
+                        x: cardStyle.scrollHPadding
+                        y: cardStyle.scrollTopPadding
+                        width: stackLayout.width - 2 * cardStyle.scrollHPadding
+                        spacing: 20
+
+                        ColumnLayout {
+                            id: ledEnabledLayout
+                            Layout.fillWidth: true
+                            visible: ledEnabled.checked && tabBar2.currentIndex === 0
+                            spacing: 20
 
                         GroupBox {
                             title: "LED General Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "LED General Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "LED Frequency (Hz) "
-                                    visible: ledEnabled.checked
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "LED Frequency (Hz) "
+                                        visible: ledEnabled.checked
+                                    }
+                                    SpinBox {
+                                        id: ledLoopDelay
+                                        from: 1
+                                        to: 1000
+                                        value: 20
+                                        stepSize: 1
+                                        visible: ledEnabled.checked
+                                        editable: true
+                                    }
                                 }
 
-                                SpinBox {
-                                    id: ledLoopDelay
-                                    from: 1
-                                    to: 1000
-                                    value: 20
-                                    stepSize: 1
-                                    visible: ledEnabled.checked
-                                    editable: true
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Max Blend Count"
+                                    }
+                                    SpinBox {
+                                        id: ledMaxBlendCount
+                                        from: 1
+                                        to: 100
+                                        value: 4
+                                        editable: true
+                                    }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Max Blend Count"
-                                }
-
-                                SpinBox {
-                                    id: ledMaxBlendCount
-                                    from: 1
-                                    to: 100
-                                    value: 4
-                                    editable: true
-                                }
-
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "LED Fix"
-                                }
-
-                                SpinBox {
-                                    id: ledFix
-                                    from: 1
-                                    to: 1000000
-                                    value: 100
-                                    editable: true
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "LED Fix"
+                                    }
+                                    SpinBox {
+                                        id: ledFix
+                                        from: 1
+                                        to: 1000000
+                                        value: 100
+                                        editable: true
+                                    }
                                 }
 
                                 CheckBox {
@@ -894,161 +1352,201 @@ Item {
                                     checked: false
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "LED Max Brightness (80% by default)"
-                                }
-
-                                Loader {
-                                    id: ledMaxBrightnessLoader
-                                    sourceComponent: customValueSlider
-                                    onLoaded: {
-                                        item.from = 0.0
-                                        item.to = 1.0
-                                        item.value = 0.8
-                                        item.stepSize = 0.01
-                                        item.asPercent = true
-                                    }
-                                }
-
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Dim RGB on Highbeam (% of main brightness)"
-                                }
-
-                                Loader {
-                                    id: ledDimOnHighbeamRatioLoader
-                                    sourceComponent: customValueSlider
-                                    onLoaded: {
-                                        item.from = 0.0
-                                        item.to = 1.0
-                                        item.value = 0.0
-                                        item.stepSize = 0.1
-                                        item.asPercent = true
-                                    }
-                                }
-
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Mode"
-                                }
-
-                                ComboBox {
-                                    id: ledMode
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "White/Red", value: 0},
-                                        {text: "Battery Meter", value: 1},
-                                        {text: "Cyan/Magenta", value: 2},
-                                        {text: "Blue/Green", value: 3},
-                                        {text: "Yellow/Green", value: 4},
-                                        {text: "Rainbow Chase", value: 5},
-                                        {text: "Strobe", value: 6},
-                                        {text: "Rave", value: 7},
-                                        {text: "Mullet", value: 8},
-                                        {text: "Knight Rider", value: 9},
-                                        {text: "Felony", value: 10},
-                                        {text: "Trans Pride", value: 11}
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "LED Max Brightness (80% by default)"
                                     }
-                                    property int value: 0
+                                    Loader {
+                                        id: ledMaxBrightnessLoader
+                                        sourceComponent: customValueSlider
+                                        onLoaded: {
+                                            item.from = 0.0
+                                            item.to = 1.0
+                                            item.value = 0.8
+                                            item.stepSize = 0.01
+                                            item.asPercent = true
+                                        }
+                                    }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Idle Mode"
-                                }
-
-                                ComboBox {
-                                    id: ledModeIdle
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: ledMode.model
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Dim RGB on Highbeam (% of main brightness)"
                                     }
-                                    property int value: 5
+                                    Loader {
+                                        id: ledDimOnHighbeamRatioLoader
+                                        sourceComponent: customValueSlider
+                                        onLoaded: {
+                                            item.from = 0.0
+                                            item.to = 1.0
+                                            item.value = 0.0
+                                            item.stepSize = 0.1
+                                            item.asPercent = true
+                                        }
+                                    }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Startup Mode"
-                                }
-
-                                ComboBox {
-                                    id: ledModeStartup
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: ledMode.model
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Mode"
                                     }
-                                    property int value: 5
+                                    ComboBox {
+                                        id: ledMode
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "White/Red", value: 0},
+                                            {text: "Battery Meter", value: 1},
+                                            {text: "Cyan/Magenta", value: 2},
+                                            {text: "Blue/Green", value: 3},
+                                            {text: "Yellow/Green", value: 4},
+                                            {text: "Rainbow Chase", value: 5},
+                                            {text: "Strobe", value: 6},
+                                            {text: "Rave", value: 7},
+                                            {text: "Mullet", value: 8},
+                                            {text: "Knight Rider", value: 9},
+                                            {text: "Felony", value: 10},
+                                            {text: "Trans Pride", value: 11}
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 0
+                                    }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Status Mode"
-                                }
-
-                                ComboBox {
-                                    id: ledModeStatus
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "Green->Red Voltage, Blue Sensor, Yellow->Red Duty", value: 0},
-                                        {text: "Swap ADC1/ADC2", value: 1},
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Idle Mode"
                                     }
-                                    property int value: 0
+                                    ComboBox {
+                                        id: ledModeIdle
+                                        Layout.fillWidth: true
+                                        model: ledMode.model
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 5
+                                    }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Button Mode"
-                                }
-
-                                ComboBox {
-                                    id: ledModeButton
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "Rainbow Chase", value: 0},
-                                        {text: "Battery Meter", value: 1},
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Startup Mode"
                                     }
-                                    property int value: 0
+                                    ComboBox {
+                                        id: ledModeStartup
+                                        Layout.fillWidth: true
+                                        model: ledMode.model
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 5
+                                    }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Footpad Mode"
-                                }
-
-                                ComboBox {
-                                    id: ledModeFootpad
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "Rainbow Chase", value: 0}
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Status Mode"
                                     }
-                                    property int value: 0
+                                    ComboBox {
+                                        id: ledModeStatus
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "Green->Red Voltage, Blue Sensor, Yellow->Red Duty", value: 0},
+                                            {text: "Swap ADC1/ADC2", value: 1},
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 0
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Layout.fillWidth: true
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Button Mode"
+                                    }
+                                    ComboBox {
+                                        id: ledModeButton
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "Rainbow Chase", value: 0},
+                                            {text: "Battery Meter", value: 1},
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 0
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Layout.fillWidth: true
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Footpad Mode"
+                                    }
+                                    ComboBox {
+                                        id: ledModeFootpad
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "Rainbow Chase", value: 0}
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 0
+                                    }
                                 }
 
                                 CheckBox {
@@ -1072,10 +1570,12 @@ Item {
                                 ColumnLayout {
                                     id: ledBrakeLightLayout
                                     visible: ledBrakeLightEnabled.checked
-                                    spacing: 10
+                                    spacing: cardStyle.labelSpacing
 
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
                                         text: "Brake Light Min Amps"
                                     }
 
@@ -1088,43 +1588,55 @@ Item {
                                     }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Idle Timeout (sec)"
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Idle Timeout (sec)"
+                                    }
+                                    SpinBox {
+                                        id: idleTimeout
+                                        from: 1
+                                        to: 100
+                                        value: 1
+                                        editable: true
+                                    }
                                 }
 
-                                SpinBox {
-                                    id: idleTimeout
-                                    from: 1
-                                    to: 100
-                                    value: 1
-                                    editable: true
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Idle Timeout Shutoff (sec)"
+                                    }
+                                    SpinBox {
+                                        id: idleTimeoutShutoff
+                                        from: 0
+                                        to: 1000
+                                        value: 600
+                                        editable: true
+                                    }
                                 }
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Idle Timeout Shutoff (sec)"
-                                }
-
-                                SpinBox {
-                                    id: idleTimeoutShutoff
-                                    from: 0
-                                    to: 1000
-                                    value: 600
-                                    editable: true
-                                }
-
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Startup Timeout (s)"
-                                }
-
-                                SpinBox {
-                                    id: ledStartupTimeout
-                                    from: 10
-                                    to: 60
-                                    value: 20
-                                    editable: true
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Startup Timeout (s)"
+                                    }
+                                    SpinBox {
+                                        id: ledStartupTimeout
+                                        from: 10
+                                        to: 60
+                                        value: 20
+                                        editable: true
+                                    }
                                 }
                             }
                         }
@@ -1132,84 +1644,105 @@ Item {
                         GroupBox {
                             title: "Status Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Status Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Status Strip"
-                                }
-
-                                ComboBox {
-                                    id: ledStatusStripType
-                                    Layout.fillWidth: true
-                                    model: [
-                                        {text: "None", value: 0},
-                                        {text: "Custom", value: 1},
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
-                                        updateStatusLEDSettings()
-                                    }
-                                    property int value: 1
-                                }
-
                                 ColumnLayout {
-                                    id: ledStatusPinLayout
-                                    visible: ledStatusStripType.currentValue > 0
-                                    spacing: 10
-
+                                    spacing: cardStyle.labelSpacing
+                                    Layout.fillWidth: true
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Status Pin"
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Status Strip"
                                     }
-
-                                    SpinBox {
-                                        id: ledStatusPin
-                                        from: -1
-                                        to: 100
-                                        value: 7
-                                        editable: true
-                                    }
-
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Status Num"
-                                    }
-
-                                    SpinBox {
-                                        id: ledStatusNum
-                                        from: 0
-                                        to: 100
-                                        value: 10
-                                        editable: true
-                                    }
-
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Status Type"
-                                    }
-
                                     ComboBox {
-                                        id: ledStatusType
+                                        id: ledStatusStripType
                                         Layout.fillWidth: true
                                         model: [
-                                            {text: "GRB", value: 0},
-                                            {text: "RGB", value: 1},
-                                            {text: "GRBW", value: 2},
-                                            {text: "RGBW", value: 3},
-                                            {text: "WRGB", value: 4},
+                                            {text: "None", value: 0},
+                                            {text: "Custom", value: 1},
                                         ]
                                         textRole: "text"
                                         valueRole: "value"
                                         onCurrentIndexChanged: {
                                             value = model[currentIndex].value
+                                            updateStatusLEDSettings()
                                         }
-                                        property int value: 0
+                                        property int value: 1
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    id: ledStatusPinLayout
+                                    visible: ledStatusStripType.currentValue > 0
+                                    spacing: cardStyle.fieldSpacing
+
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Status Pin"
+                                        }
+                                        SpinBox {
+                                            id: ledStatusPin
+                                            from: -1
+                                            to: 100
+                                            value: 7
+                                            editable: true
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Status Num"
+                                        }
+                                        SpinBox {
+                                            id: ledStatusNum
+                                            from: 0
+                                            to: 100
+                                            value: 10
+                                            editable: true
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Layout.fillWidth: true
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Status Type"
+                                        }
+                                        ComboBox {
+                                            id: ledStatusType
+                                            Layout.fillWidth: true
+                                            model: [
+                                                {text: "GRB", value: 0},
+                                                {text: "RGB", value: 1},
+                                                {text: "GRBW", value: 2},
+                                                {text: "RGBW", value: 3},
+                                                {text: "WRGB", value: 4},
+                                            ]
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            onCurrentIndexChanged: {
+                                                value = model[currentIndex].value
+                                            }
+                                            property int value: 0
+                                        }
                                     }
 
                                     CheckBox {
@@ -1224,40 +1757,48 @@ Item {
                         GroupBox {
                             title: "LED Front Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "LED Front Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Front Strip"
-                                }
-
-                                ComboBox {
-                                    id: ledFrontStripType
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "None", value: 0},
-                                        {text: "Custom", value: 1},
-                                        {text: "Avaspark Laserbeam", value: 2},
-                                        {text: "Avaspark Laserbeam Pint", value: 3},
-                                        {text: "JetFleet H4", value: 4},
-                                        {text: "JetFleet H4 (no limit DCDC)", value: 5},
-                                        {text: "JetFleet GT", value: 6},
-                                        {text: "Stock GT", value: 7},
-                                        {text: "Avaspark Laserbeam V2", value: 8},
-                                        {text: "Avaspark Laserbeam V2 Pint", value: 9},
-                                        {text: "Light-shutka Flashfires", value: 10},
-                                        {text: "Fungineers GTFO", value: 11},
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
-                                        updateFrontLEDSettings()
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Front Strip"
                                     }
-                                    property int value: 2
+                                    ComboBox {
+                                        id: ledFrontStripType
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "None", value: 0},
+                                            {text: "Custom", value: 1},
+                                            {text: "Avaspark Laserbeam", value: 2},
+                                            {text: "Avaspark Laserbeam Pint", value: 3},
+                                            {text: "JetFleet H4", value: 4},
+                                            {text: "JetFleet H4 (no limit DCDC)", value: 5},
+                                            {text: "JetFleet GT", value: 6},
+                                            {text: "Stock GT", value: 7},
+                                            {text: "Avaspark Laserbeam V2", value: 8},
+                                            {text: "Avaspark Laserbeam V2 Pint", value: 9},
+                                            {text: "Light-shutka Flashfires", value: 10},
+                                            {text: "Fungineers GTFO", value: 11},
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                            updateFrontLEDSettings()
+                                        }
+                                        property int value: 2
+                                    }
                                 }
 
                                 ColumnLayout {
@@ -1266,7 +1807,9 @@ Item {
                                     spacing: 10
 
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
                                         text: "Front Pin"
                                     }
 
@@ -1285,7 +1828,9 @@ Item {
                                     spacing: 10
 
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
                                         text: "Front Highbeam Pin"
                                     }
 
@@ -1303,40 +1848,49 @@ Item {
                                     visible: ledFrontStripType.currentValue === 1
                                     spacing: 10
 
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Front Num"
-                                    }
-
-                                    SpinBox {
-                                        id: ledFrontNum
-                                        from: 0
-                                        to: 100
-                                        value: 18
-                                        editable: true
-                                    }
-
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Front Type"
-                                    }
-
-                                    ComboBox {
-                                        id: ledFrontType
-                                        Layout.fillWidth: true
-                                        model: [
-                                            {text: "GRB", value: 0},
-                                            {text: "RGB", value: 1},
-                                            {text: "GRBW", value: 2},
-                                            {text: "RGBW", value: 3},
-                                            {text: "WRGB", value: 4},
-                                        ]
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        onCurrentIndexChanged: {
-                                            value = model[currentIndex].value
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Front Num"
                                         }
-                                        property int value: 0
+                                        SpinBox {
+                                            id: ledFrontNum
+                                            from: 0
+                                            to: 100
+                                            value: 18
+                                            editable: true
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Layout.fillWidth: true
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Front Type"
+                                        }
+                                        ComboBox {
+                                            id: ledFrontType
+                                            Layout.fillWidth: true
+                                            model: [
+                                                {text: "GRB", value: 0},
+                                                {text: "RGB", value: 1},
+                                                {text: "GRBW", value: 2},
+                                                {text: "RGBW", value: 3},
+                                                {text: "WRGB", value: 4},
+                                            ]
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            onCurrentIndexChanged: {
+                                                value = model[currentIndex].value
+                                            }
+                                            property int value: 0
+                                        }
                                     }
                                 }
 
@@ -1357,49 +1911,59 @@ Item {
                         GroupBox {
                             title: "LED Rear Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "LED Rear Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Rear Strip"
-                                }
-
-                                ComboBox {
-                                    id: ledRearStripType
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "None", value: 0},
-                                        {text: "Custom", value: 1},
-                                        {text: "Avaspark Laserbeam", value: 2},
-                                        {text: "Avaspark Laserbeam Pint", value: 3},
-                                        {text: "JetFleet H4", value: 4},
-                                        {text: "JetFleet H4 (no limit DCDC)", value: 5},
-                                        {text: "JetFleet GT", value: 6},
-                                        {text: "Stock GT", value: 7},
-                                        {text: "Avaspark Laserbeam V2", value: 8},
-                                        {text: "Avaspark Laserbeam V2 Pint", value: 9},
-                                        {text: "Light-shutka Flashfires", value: 10},
-                                        {text: "Fungineers GTFO", value: 11},
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
-                                        updateRearLEDSettings()
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Rear Strip"
                                     }
-                                    property int value: 2
+                                    ComboBox {
+                                        id: ledRearStripType
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "None", value: 0},
+                                            {text: "Custom", value: 1},
+                                            {text: "Avaspark Laserbeam", value: 2},
+                                            {text: "Avaspark Laserbeam Pint", value: 3},
+                                            {text: "JetFleet H4", value: 4},
+                                            {text: "JetFleet H4 (no limit DCDC)", value: 5},
+                                            {text: "JetFleet GT", value: 6},
+                                            {text: "Stock GT", value: 7},
+                                            {text: "Avaspark Laserbeam V2", value: 8},
+                                            {text: "Avaspark Laserbeam V2 Pint", value: 9},
+                                            {text: "Light-shutka Flashfires", value: 10},
+                                            {text: "Fungineers GTFO", value: 11},
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                            updateRearLEDSettings()
+                                        }
+                                        property int value: 2
+                                    }
                                 }
 
                                 ColumnLayout {
                                     id: ledRearPinLayout
                                     visible: ledRearStripType.currentValue > 0
-                                    spacing: 10
+                                    spacing: cardStyle.labelSpacing
 
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
                                         text: "Rear Pin"
                                     }
 
@@ -1415,10 +1979,12 @@ Item {
                                 ColumnLayout {
                                     id: ledRearHighbeamPinLayout
                                     visible: ledRearStripType.currentValue === 7
-                                    spacing: 10
+                                    spacing: cardStyle.labelSpacing
 
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
                                         text: "Rear Highbeam Pin"
                                     }
 
@@ -1434,42 +2000,51 @@ Item {
                                 ColumnLayout {
                                     id: ledRearCustomSettings
                                     visible: ledRearStripType.currentValue === 1
-                                    spacing: 10
+                                    spacing: cardStyle.fieldSpacing
 
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Rear Num"
-                                    }
-
-                                    SpinBox {
-                                        id: ledRearNum
-                                        from: 0
-                                        to: 100
-                                        value: 18
-                                        editable: true
-                                    }
-
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Rear Type"
-                                    }
-
-                                    ComboBox {
-                                        id: ledRearType
-                                        Layout.fillWidth: true
-                                        model: [
-                                            {text: "GRB", value: 0},
-                                            {text: "RGB", value: 1},
-                                            {text: "GRBW", value: 2},
-                                            {text: "RGBW", value: 3},
-                                            {text: "WRGB", value: 4},
-                                        ]
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        onCurrentIndexChanged: {
-                                            value = model[currentIndex].value
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Rear Num"
                                         }
-                                        property int value: 0
+                                        SpinBox {
+                                            id: ledRearNum
+                                            from: 0
+                                            to: 100
+                                            value: 18
+                                            editable: true
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Layout.fillWidth: true
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Rear Type"
+                                        }
+                                        ComboBox {
+                                            id: ledRearType
+                                            Layout.fillWidth: true
+                                            model: [
+                                                {text: "GRB", value: 0},
+                                                {text: "RGB", value: 1},
+                                                {text: "GRBW", value: 2},
+                                                {text: "RGBW", value: 3},
+                                                {text: "WRGB", value: 4},
+                                            ]
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            onCurrentIndexChanged: {
+                                                value = model[currentIndex].value
+                                            }
+                                            property int value: 0
+                                        }
                                     }
                                 }
 
@@ -1490,38 +2065,48 @@ Item {
                         GroupBox {
                             title: "LED Button Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "LED Button Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Button"
-                                }
-
-                                ComboBox {
-                                    id: ledButtonStripType
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "None", value: 0},
-                                        {text: "NeoPixel RGB", value: 1},
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Button"
                                     }
-                                    property int value: 0
+                                    ComboBox {
+                                        id: ledButtonStripType
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "None", value: 0},
+                                            {text: "NeoPixel RGB", value: 1},
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 0
+                                    }
                                 }
 
                                 ColumnLayout {
                                     id: ledButtonPinLayout
                                     visible: ledButtonStripType.currentValue > 0
-                                    spacing: 10
+                                    spacing: cardStyle.labelSpacing
 
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
                                         text: "Button Pin"
                                     }
 
@@ -1545,39 +2130,49 @@ Item {
                         GroupBox {
                             title: "LED Footpad Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "LED Footpad Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Footpad Strip"
-                                }
-
-                                ComboBox {
-                                    id: ledFootpadStripType
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     Layout.fillWidth: true
-                                    model: [
-                                        {text: "None", value: 0},
-                                        {text: "Custom", value: 1}
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
-                                        updateFootpadLEDSettings()
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Footpad Strip"
                                     }
-                                    property int value: 0
+                                    ComboBox {
+                                        id: ledFootpadStripType
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "None", value: 0},
+                                            {text: "Custom", value: 1}
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                            updateFootpadLEDSettings()
+                                        }
+                                        property int value: 0
+                                    }
                                 }
 
                                 ColumnLayout {
                                     id: ledFootpadPinLayout
                                     visible: ledFootpadStripType.currentValue > 0
-                                    spacing: 10
+                                    spacing: cardStyle.labelSpacing
 
                                     Text {
-                                        color: Utility.getAppHexColor("lightText")
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
                                         text: "Footpad Pin"
                                     }
 
@@ -1593,42 +2188,51 @@ Item {
                                 ColumnLayout {
                                     id: ledFootpadCustomSettings
                                     visible: ledFootpadStripType.currentValue === 1
-                                    spacing: 10
+                                    spacing: cardStyle.fieldSpacing
 
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Footpad Num"
-                                    }
-
-                                    SpinBox {
-                                        id: ledFootpadNum
-                                        from: 0
-                                        to: 100
-                                        value: 13
-                                        editable: true
-                                    }
-
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "Footpad Type"
-                                    }
-
-                                    ComboBox {
-                                        id: ledFootpadType
-                                        Layout.fillWidth: true
-                                        model: [
-                                            {text: "GRB", value: 0},
-                                            {text: "RGB", value: 1},
-                                            {text: "GRBW", value: 2},
-                                            {text: "RGBW", value: 3},
-                                            {text: "WRGB", value: 4},
-                                        ]
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        onCurrentIndexChanged: {
-                                            value = model[currentIndex].value
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Footpad Num"
                                         }
-                                        property int value: 0
+                                        SpinBox {
+                                            id: ledFootpadNum
+                                            from: 0
+                                            to: 100
+                                            value: 13
+                                            editable: true
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Layout.fillWidth: true
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "Footpad Type"
+                                        }
+                                        ComboBox {
+                                            id: ledFootpadType
+                                            Layout.fillWidth: true
+                                            model: [
+                                                {text: "GRB", value: 0},
+                                                {text: "RGB", value: 1},
+                                                {text: "GRBW", value: 2},
+                                                {text: "RGBW", value: 3},
+                                                {text: "WRGB", value: 4},
+                                            ]
+                                            textRole: "text"
+                                            valueRole: "value"
+                                            onCurrentIndexChanged: {
+                                                value = model[currentIndex].value
+                                            }
+                                            property int value: 0
+                                        }
                                     }
                                 }
 
@@ -1648,30 +2252,37 @@ Item {
                     }
 
                     ColumnLayout {
-                        width: stackLayout.width
-                        spacing: 10
+                        Layout.fillWidth: true
+                        spacing: 20
                         visible: pubmoteEnabled.checked && tabBar2.currentIndex === 1
                         GroupBox {
+                            title: "Pubmote Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Pubmote Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Frequency (Hz)"
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     visible: pubmoteEnabled.checked
-                                }
-
-                                SpinBox {
-                                    id: pubmoteLoopDelay
-                                    from: 1
-                                    to: 1000
-                                    value: 8
-                                    stepSize: 1
-                                    visible: pubmoteEnabled.checked
-                                    editable: true
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Frequency (Hz)"
+                                    }
+                                    SpinBox {
+                                        id: pubmoteLoopDelay
+                                        from: 1
+                                        to: 1000
+                                        value: 8
+                                        stepSize: 1
+                                        editable: true
+                                    }
                                 }
 
                                 Text {
@@ -1687,11 +2298,128 @@ Item {
                                 }
 
                                 Button {
-                                    text: "Pair Pubmote"
+                                    text: isPubmotePaired ? "Unpair Pubmote" : "Pair Pubmote"
                                     Layout.fillWidth: true
                                     Layout.preferredWidth: 500
                                     onClicked: {
-                                        pubmotePairPopup.open();  // Open the confirmation popup with the random code
+                                        if (isPubmotePaired) {
+                                            sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(pair-pubmote -2)");
+                                            sendCode(String.fromCharCode(102) + String.fromCharCode(1) + "(send-config)");
+                                        } else {
+                                            pubmotePairPopup.open();  // Open the confirmation popup with the random code
+                                        }
+                                    }
+                                }
+
+                            }
+                        }
+
+                        GroupBox {
+                            id: inputPreviewSection
+                            title: "Input Preview"
+                            Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Input Preview" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                spacing: 10
+
+                                Switch {
+                                    id: inputPreviewEnabled
+                                    text: "Live Preview"
+                                    checked: false
+                                }
+
+                                Text {
+                                    visible: inputPreviewEnabled.checked
+                                    text: pubmoteInputConnected ? "Pubmote connected" : "Pubmote not connected"
+                                    color: pubmoteInputConnected ? "cyan" : Utility.getAppHexColor("lightText")
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+
+                                ColumnLayout {
+                                    visible: inputPreviewEnabled.checked
+                                    spacing: 10
+                                    Layout.alignment: Qt.AlignHCenter
+
+                                    Rectangle {
+                                        id: joystickPad
+                                        Layout.alignment: Qt.AlignHCenter
+                                        Layout.preferredWidth: 160
+                                        Layout.preferredHeight: 160
+                                        color: "transparent"
+                                        border.color: Qt.rgba(1, 1, 1, 0.3)
+                                        border.width: 1
+                                        radius: 8
+
+                                        Rectangle {
+                                            width: 1
+                                            height: parent.height - 2
+                                            anchors.centerIn: parent
+                                            color: Qt.rgba(1, 1, 1, 0.15)
+                                        }
+                                        Rectangle {
+                                            width: parent.width - 2
+                                            height: 1
+                                            anchors.centerIn: parent
+                                            color: Qt.rgba(1, 1, 1, 0.15)
+                                        }
+
+                                        Rectangle {
+                                            width: 14
+                                            height: 14
+                                            radius: 7
+                                            color: pubmoteInputConnected ? "cyan" : "gray"
+                                            x: (parent.width - width) / 2 + Math.max(-1, Math.min(1, pubmoteInputJsx)) * (parent.width - width) / 2
+                                            y: (parent.height - height) / 2 - Math.max(-1, Math.min(1, pubmoteInputJsy)) * (parent.height - height) / 2
+                                        }
+                                    }
+
+                                    Text {
+                                        text: "Y: " + pubmoteInputJsy.toFixed(3) + "    X: " + pubmoteInputJsx.toFixed(3)
+                                        color: Utility.getAppHexColor("lightText")
+                                        Layout.alignment: Qt.AlignHCenter
+                                    }
+
+                                    RowLayout {
+                                        spacing: 10
+                                        Layout.alignment: Qt.AlignHCenter
+
+                                        Rectangle {
+                                            Layout.preferredWidth: 70
+                                            Layout.preferredHeight: 32
+                                            radius: 6
+                                            color: pubmoteInputBtC ? "cyan" : Qt.rgba(1, 1, 1, 0.1)
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "C"
+                                                color: pubmoteInputBtC ? "black" : "white"
+                                            }
+                                        }
+                                        Rectangle {
+                                            Layout.preferredWidth: 70
+                                            Layout.preferredHeight: 32
+                                            radius: 6
+                                            color: pubmoteInputBtZ ? "cyan" : Qt.rgba(1, 1, 1, 0.1)
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "Z"
+                                                color: pubmoteInputBtZ ? "black" : "white"
+                                            }
+                                        }
+                                        Rectangle {
+                                            Layout.preferredWidth: 70
+                                            Layout.preferredHeight: 32
+                                            radius: 6
+                                            color: pubmoteInputRev ? "cyan" : Qt.rgba(1, 1, 1, 0.1)
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "REV"
+                                                color: pubmoteInputRev ? "black" : "white"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1699,61 +2427,73 @@ Item {
                     }
 
                     ColumnLayout {
-                        width: stackLayout.width
-                        spacing: 10
+                        Layout.fillWidth: true
+                        spacing: 20
                         visible: bmsEnabled.checked && tabBar2.currentIndex === 2
                         GroupBox {
+                            title: "BMS Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "BMS Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
 
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "BMS Frequency (Hz)"
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
                                     visible: bmsEnabled.checked
-                                }
-
-                                SpinBox {
-                                    id: bmsLoopDelay
-                                    from: 1
-                                    to: 1000
-                                    value: 8
-                                    stepSize: 1
-                                    visible: bmsEnabled.checked
-                                    editable: true
-                                }
-
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "BMS Type"
-                                }
-
-                                ComboBox {
-                                    id: bmsType
-                                    Layout.fillWidth: true
-                                    model: [
-                                        {text: "None", value: 0},
-                                        {text: "Unencrypted", value: 1},
-                                        {text: "Encrypted", value: 2},
-                                    ]
-                                    textRole: "text"
-                                    valueRole: "value"
-                                    onCurrentIndexChanged: {
-                                        value = model[currentIndex].value
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "BMS Frequency (Hz)"
                                     }
-                                    property int value: 0
+                                    SpinBox {
+                                        id: bmsLoopDelay
+                                        from: 1
+                                        to: 1000
+                                        value: 8
+                                        stepSize: 1
+                                        editable: true
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Layout.fillWidth: true
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "BMS Type"
+                                    }
+                                    ComboBox {
+                                        id: bmsType
+                                        Layout.fillWidth: true
+                                        model: [
+                                            {text: "None", value: 0},
+                                            {text: "Unencrypted", value: 1},
+                                            {text: "Encrypted", value: 2},
+                                        ]
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        onCurrentIndexChanged: {
+                                            value = model[currentIndex].value
+                                        }
+                                        property int value: 0
+                                    }
                                 }
 
                                 ColumnLayout {
                                     id: bmsSettings
                                     visible: bmsType.currentIndex > 0
-                                    spacing: 10
+                                    spacing: cardStyle.fieldSpacing
 
                                     ColumnLayout {
                                         id: bmsCryptoSettingsLayout
                                         visible: bmsType.currentIndex > 1
-                                        spacing: 10
+                                        spacing: cardStyle.fieldSpacing
 
                                         Button {
                                             text: "Set Keys"
@@ -1771,48 +2511,60 @@ Item {
                                         checked: false
                                     }
 
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "RS485 RO/A Pin"
-                                    }
-
-                                    SpinBox {
-                                        id: bmsRs485ROPin
-                                        from: -1
-                                        to: 100
-                                        value: -1
-                                        editable: true
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "RS485 RO/A Pin"
+                                        }
+                                        SpinBox {
+                                            id: bmsRs485ROPin
+                                            from: -1
+                                            to: 100
+                                            value: -1
+                                            editable: true
+                                        }
                                     }
 
                                     ColumnLayout {
                                         id: bmsRS485chipLayout
                                         visible: bmsRS485Chip.checked
-                                        spacing: 10
+                                        spacing: cardStyle.fieldSpacing
 
-                                        Text {
-                                            color: Utility.getAppHexColor("lightText")
-                                            text: "RS485 DI Pin"
+                                        ColumnLayout {
+                                            spacing: cardStyle.labelSpacing
+                                            Text {
+                                                color: fieldLabelStyle.color
+                                                font.pixelSize: fieldLabelStyle.pixelSize
+                                                font.bold: fieldLabelStyle.bold
+                                                text: "RS485 DI Pin"
+                                            }
+                                            SpinBox {
+                                                id: bmsRs485DIPin
+                                                from: -1
+                                                to: 100
+                                                value: -1
+                                                editable: true
+                                            }
                                         }
 
-                                        SpinBox {
-                                            id: bmsRs485DIPin
-                                            from: -1
-                                            to: 100
-                                            value: -1
-                                            editable: true
-                                        }
-
-                                        Text {
-                                            color: Utility.getAppHexColor("lightText")
-                                            text: "RS485 DE/RE Pin"
-                                        }
-
-                                        SpinBox {
-                                            id: bmsRs485DEREPin
-                                            from: -1
-                                            to: 100
-                                            value: -1
-                                            editable: true
+                                        ColumnLayout {
+                                            spacing: cardStyle.labelSpacing
+                                            Text {
+                                                color: fieldLabelStyle.color
+                                                font.pixelSize: fieldLabelStyle.pixelSize
+                                                font.bold: fieldLabelStyle.bold
+                                                text: "RS485 DE/RE Pin"
+                                            }
+                                            SpinBox {
+                                                id: bmsRs485DEREPin
+                                                from: -1
+                                                to: 100
+                                                value: -1
+                                                editable: true
+                                            }
                                         }
 
                                         Button {
@@ -1833,10 +2585,12 @@ Item {
                                     ColumnLayout {
                                         id: bmsChargeOnlyLayout
                                         visible: bmsChargeOnly.checked
-                                        spacing: 10
+                                        spacing: cardStyle.labelSpacing
 
                                         Text {
-                                            color: Utility.getAppHexColor("lightText")
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
                                             text: "Wakeup Pin"
                                         }
 
@@ -1855,17 +2609,21 @@ Item {
                                         checked: false
                                     }
 
-                                    Text {
-                                        color: Utility.getAppHexColor("lightText")
-                                        text: "BMS Buffer Size"
-                                    }
-
-                                    SpinBox {
-                                        id: bmsBuffSize
-                                        from: 16
-                                        to: 256
-                                        value: 128
-                                        editable: true
+                                    ColumnLayout {
+                                        spacing: cardStyle.labelSpacing
+                                        Text {
+                                            color: fieldLabelStyle.color
+                                            font.pixelSize: fieldLabelStyle.pixelSize
+                                            font.bold: fieldLabelStyle.bold
+                                            text: "BMS Buffer Size"
+                                        }
+                                        SpinBox {
+                                            id: bmsBuffSize
+                                            from: 16
+                                            to: 256
+                                            value: 128
+                                            editable: true
+                                        }
                                     }
                                 }
                             }
@@ -1873,27 +2631,35 @@ Item {
                     }
                     
                     ColumnLayout {
-                        width: stackLayout.width
-                        spacing: 10
+                        Layout.fillWidth: true
+                        spacing: 20
                         visible: logEnabled.checked && tabBar2.currentIndex === 3
                         GroupBox {
+                            title: "Logging Config"
                             Layout.fillWidth: true
+                            background: Loader { sourceComponent: cardBg }
+                            label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Logging Config" }
+                            topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 10
-                                Text {
-                                    color: Utility.getAppHexColor("lightText")
-                                    text: "Logging Frequency (Hz)"
-                                }
-
-                                SpinBox {
-                                    id: logRate
-                                    from: 1
-                                    to: 1000
-                                    value: 2
-                                    stepSize: 1
-                                    editable: true
+                                ColumnLayout {
+                                    spacing: cardStyle.labelSpacing
+                                    Text {
+                                        color: fieldLabelStyle.color
+                                        font.pixelSize: fieldLabelStyle.pixelSize
+                                        font.bold: fieldLabelStyle.bold
+                                        text: "Logging Frequency (Hz)"
+                                    }
+                                    SpinBox {
+                                        id: logRate
+                                        from: 1
+                                        to: 1000
+                                        value: 2
+                                        stepSize: 1
+                                        editable: true
+                                    }
                                 }
 
                                 CheckBox {
@@ -1929,6 +2695,7 @@ Item {
                             }
                         }
                     }
+                    }
                 }
             }
 
@@ -1936,34 +2703,48 @@ Item {
             ScrollView {
                 clip: true
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                background: Rectangle { color: cardStyle.scrollViewBg }
 
-                ColumnLayout {
+                Item {
                     width: stackLayout.width
-                    spacing: 10
+                    implicitHeight: scrollContent3.implicitHeight + cardStyle.scrollTopPadding + cardStyle.scrollBottomPadding
+
+                    ColumnLayout {
+                        id: scrollContent3
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.topMargin: cardStyle.scrollTopPadding
+                        anchors.leftMargin: cardStyle.scrollHPadding
+                        anchors.rightMargin: cardStyle.scrollHPadding
+                        spacing: 20
 
                     GroupBox {
                         title: "Features"
                         Layout.fillWidth: true
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Features" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: 10
+                            spacing: 6
                             CheckBox {
                                 id: ledEnabled
-                                text: "LED Enabled (requires reboot)"
+                                text: "Lighting Enabled"
                                 checked: false
                             }
 
                             CheckBox {
                                 id: pubmoteEnabled
-                                text: "Pubmote Enabled (requires reboot)"
+                                text: "Pubmote Enabled"
                                 checked: false
                                 enabled: true
                             }
 
                             CheckBox {
                                 id: bmsEnabled
-                                text: "BMS Enabled (requires reboot)"
+                                text: "BMS Enabled"
                                 checked: false
                                 enabled: true
                             }
@@ -1987,6 +2768,9 @@ Item {
                     GroupBox {
                         title: "State of Charge Reporting"
                         Layout.fillWidth: true
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "State of Charge Reporting" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -2003,16 +2787,19 @@ Item {
                                 text: qsTr("Voltage Curve Based")
                             }
 
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "Cell Type"
-                                visible: voltageCurveSoc.checked
-                            }
-
-                            ComboBox {
-                                id: cellType
+                            ColumnLayout {
+                                spacing: cardStyle.labelSpacing
                                 visible: voltageCurveSoc.checked
                                 Layout.fillWidth: true
+                                Text {
+                                    color: fieldLabelStyle.color
+                                    font.pixelSize: fieldLabelStyle.pixelSize
+                                    font.bold: fieldLabelStyle.bold
+                                    text: "Cell Type"
+                                }
+                                ComboBox {
+                                    id: cellType
+                                    Layout.fillWidth: true
                                     model: [
                                         {text: "Linear", value: 0},
                                         {text: "P28A", value: 1},
@@ -2024,12 +2811,13 @@ Item {
                                         {text: "50S", value: 7},
                                         {text: "VTC6", value: 8},
                                     ]
-                                textRole: "text"
-                                valueRole: "value"
-                                onCurrentIndexChanged: {
-                                   value = model[currentIndex].value
+                                    textRole: "text"
+                                    valueRole: "value"
+                                    onCurrentIndexChanged: {
+                                       value = model[currentIndex].value
+                                    }
+                                    property int value: 0
                                 }
-                                property int value: 0
                             }
                         }
                     }
@@ -2037,23 +2825,30 @@ Item {
                     GroupBox {
                         title: "Loop Settings"
                         Layout.fillWidth: true
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Loop Settings" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             width: stackLayout.width
                             spacing: 10
 
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "CAN Frequency (Hz)"
-                            }
-
-                            SpinBox {
-                                id: canLoopDelay
-                                from: 1
-                                to: 1000
-                                value: 8
-                                stepSize: 1
-                                editable: true
+                            ColumnLayout {
+                                spacing: cardStyle.labelSpacing
+                                Text {
+                                    color: fieldLabelStyle.color
+                                    font.pixelSize: fieldLabelStyle.pixelSize
+                                    font.bold: fieldLabelStyle.bold
+                                    text: "CAN Frequency (Hz)"
+                                }
+                                SpinBox {
+                                    id: canLoopDelay
+                                    from: 1
+                                    to: 1000
+                                    value: 8
+                                    stepSize: 1
+                                    editable: true
+                                }
                             }
                         }
                     }
@@ -2062,36 +2857,49 @@ Item {
                         title: "Humidity Sensor"
                         Layout.fillWidth: true
                         visible: humidityEnabled.checked
+                        background: Loader { sourceComponent: cardBg }
+                        label: Loader { sourceComponent: cardTitleLabel; onLoaded: item.title = "Humidity Sensor" }
+                        topPadding: cardStyle.topPadding; leftPadding: cardStyle.sidePadding; rightPadding: cardStyle.sidePadding; bottomPadding: cardStyle.bottomPadding
 
                         ColumnLayout {
                             anchors.fill: parent
                             width: stackLayout.width
                             spacing: 10
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "SDA Pin"
+                            ColumnLayout {
+                                spacing: cardStyle.labelSpacing
+                                Text {
+                                    color: fieldLabelStyle.color
+                                    font.pixelSize: fieldLabelStyle.pixelSize
+                                    font.bold: fieldLabelStyle.bold
+                                    text: "SDA Pin"
+                                }
+                                SpinBox {
+                                    id: humiditySdaPin
+                                    from: -1
+                                    to: 100
+                                    value: 7
+                                    editable: true
+                                }
                             }
 
-                            SpinBox {
-                                id: humiditySdaPin
-                                from: -1
-                                to: 100
-                                value: 7
-                                editable: true
-                            }
-                            Text {
-                                color: Utility.getAppHexColor("lightText")
-                                text: "SLC Pin"
-                            }
-
-                            SpinBox {
-                                id: humiditySlcPin
-                                from: -1
-                                to: 100
-                                value: 7
-                                editable: true
+                            ColumnLayout {
+                                spacing: cardStyle.labelSpacing
+                                Text {
+                                    color: fieldLabelStyle.color
+                                    font.pixelSize: fieldLabelStyle.pixelSize
+                                    font.bold: fieldLabelStyle.bold
+                                    text: "SLC Pin"
+                                }
+                                SpinBox {
+                                    id: humiditySlcPin
+                                    from: -1
+                                    to: 100
+                                    value: 7
+                                    editable: true
+                                }
                             }
                         }
+                    }
                     }
                 }
             }
@@ -2099,39 +2907,41 @@ Item {
             // About Tab
             ScrollView {
                 clip: true
+                contentWidth: availableWidth
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                background: Rectangle { color: cardStyle.scrollViewBg }
 
-                ColumnLayout {
-                    width: stackLayout.width
-                    spacing: 20
+                TextArea {
+                    id: aboutText
+                    leftPadding: cardStyle.scrollHPadding
+                    rightPadding: cardStyle.scrollHPadding
+                    topPadding: cardStyle.scrollTopPadding
+                    bottomPadding: cardStyle.scrollBottomPadding
+                    textFormat: Text.RichText
+                    text: "<p><b>FLOAT ACCESSORIES PACKAGE</b></p>" +
+                        "<p>A VESC Express package for controlling LEDs, BMS and Pubmote.</p>" +
 
-                    TextArea {
-                        id: aboutText
-                        textFormat: Text.RichText
-                        text: "<p><b>FLOAT ACCESSORIES PACKAGE</b></p>" +
-                            "<p>A VESC Express package for controlling LEDs, BMS and Pubmote.</p>" +
+                        "<p><b>Support Future Work</b></p>" +
+                        "<p>Buy me a Coffee: <a href='https://venmo.com/sylerclayton'>https://venmo.com/sylerclayton</a></p>" +
+                        "<p>Support me on Patreon: <a href='https://patreon.com/SylerTheCreator'>https://patreon.com/SylerTheCreator</a></p>" +
 
-                            "<p><b>Support Future Work</b></p>" +
-                            "<p>Buy me a Coffee: <a href='https://venmo.com/sylerclayton'>https://venmo.com/sylerclayton</a></p>" +
-                            "<p>Support me on Patreon: <a href='https://patreon.com/SylerTheCreator'>https://patreon.com/SylerTheCreator</a></p>" +
+                        "<p><b>CREDITS</b></p>" +
+                        "<p>Special Thanks: Benjamin Vedder, surfdado, Mitch (NuRxG), Siwoz, lolwheel (OWIE), ThankTheMaker (rESCue), 4_fools (avaspark), auden_builds (pubmote)</p>" +
+                        "<p>gr33tz: outlandnish, exphat, datboig42069</p>" +
+                        "<p>Beta Testers: Pickles</p>" +
 
-                            "<p><b>CREDITS</b></p>" +
-                            "<p>Special Thanks: Benjamin Vedder, surfdado, Mitch (NuRxG), Siwoz, lolwheel (OWIE), ThankTheMaker (rESCue), 4_fools (avaspark), auden_builds (pubmote)</p>" +
-                            "<p>gr33tz: outlandnish, exphat, datboig42069</p>" +
-                            "<p>Beta Testers: Pickles</p>" +
+                        "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
 
-                            "<p>My Blog: <a href='https://sylerclayton.com'>https://sylerclayton.com</a></p>" +
-
-                            "<p><b>BUILD INFO</b></p>" +
-                            "<p>Version 3.2.2</p>" +
-                            "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
-                        Layout.fillWidth: true
-                        wrapMode: Text.WordWrap
-                        color: Utility.getAppHexColor("lightText")
-                        onLinkActivated: function(url) {
-                            Qt.openUrlExternally(url)
-                        }
+                        "<p><b>BUILD INFO</b></p>" +
+                        "<p>Version 3.4.0</p>" +
+                        "<p>Source code can be found here: <a href='https://github.com/relys/vesc_pkg'>https://github.com/relys/vesc_pkg</a></p>"
+                    wrapMode: Text.WordWrap
+                    readOnly: true
+                    color: Utility.getAppHexColor("lightText")
+                    background: null
+                    onLinkActivated: function(url) {
+                        Qt.openUrlExternally(url)
                     }
                 }
             }
@@ -2146,8 +2956,8 @@ Item {
             Item { Layout.fillWidth: true }
 
             Button {
-                text: "Save Config"
-                enabled: readConfig && lastStatusTime < 2
+                text: statusTimeout ? "Not connected" : "Save Config"
+                enabled: readConfig && !statusTimeout
                 onClicked: {
                     if (bmsEnabled.checked && !acceptTOS) {
                         termsPopup.visible = true
@@ -2164,6 +2974,7 @@ Item {
                 id: optionsButton
                 text: "⋮"
                 font.pixelSize: 24
+                enabled: !statusTimeout
                 onClicked: optionsMenu.open()
 
                 Menu {
@@ -2330,7 +3141,20 @@ Item {
     }
 
     function handleDebouncedChange() {
-        debounceTimer.restart()  // Reset the timer on any change
+        if (!throttleTimer.running) {
+            applyControlChanges()
+            throttleTimer.start()
+        } else {
+            throttleTimer.controlPending = true
+        }
+    }
+
+    function flushControlChanges() {
+        if (throttleTimer.controlPending) {
+            applyControlChanges()
+            throttleTimer.controlPending = false
+        }
+        throttleTimer.stop()
     }
 
     function applyControlChanges() {
@@ -2523,7 +3347,7 @@ Item {
                 var macAddress = unpack.map(function(token) {
                     return ("0" + Number(token).toString(16)).slice(-2);
                 }).join(":");
-                // esp-now-secret-code 48
+                // pubmote-secret-code 48
                 bmsRs485DIPin.value = Number(tokens[49])
                 bmsRs485ROPin.value = Number(tokens[50])
                 bmsRs485DEREPin.value = Number(tokens[51])
@@ -2566,8 +3390,9 @@ Item {
                 humiditySdaPin.value = Number(tokens[86])
                 humiditySlcPin.value = Number(tokens[87])
 
+                isPubmoteBle = (macAddress === "00:00:00:00:00:00");
                 isPubmotePaired = (Number(tokens[46]) != -1);
-                pubmoteMacAddress.text = "MAC: " + (!isPubmotePaired ? "Not Paired" : macAddress.toUpperCase());
+                pubmoteMacAddress.text = !isPubmotePaired ? "MAC: Not Paired" : (isPubmoteBle ? "Connection: BLE" : "MAC: " + macAddress.toUpperCase());
                 readConfig = true;
             } else if (str.startsWith("msg")) {
                 var msg = str.substring(4)
@@ -2576,15 +3401,15 @@ Item {
                 var tokens = str.split(" ")
 
                 // Float Package connection status
-                floatPackageConnected = Number(tokens[1])
-                if (floatPackageConnected === 1) {
+                floatPackageConnected = !!Number(tokens[1])
+                if (floatPackageConnected) {
                     floatPackageLastStatusTime = 0
                 }
 
                 // Pubmote connection status
-                pubmoteConnected = Number(tokens[2])
+                pubmoteConnected = !!Number(tokens[2])
                 pubmoteWifiChannel = Number(tokens[7])
-                if (pubmoteConnected === 1) {
+                if (pubmoteConnected) {
                     pubmoteLastStatusTime = 0
                 }
 
@@ -2609,13 +3434,13 @@ Item {
 
                 // Update status flags
                 lastStatusTime = 0  // Reset the timer when status is received
-                if (floatPackageConnected === 1) {
+                if (floatPackageConnected) {
                     floatPackageLastStatusTime = 0
                 } else {
                     floatPackageLastStatusTime = floatPackageLastStatusTime // Trigger binding re-evaluation
                 }
                 
-                if (pubmoteConnected === 1) {
+                if (pubmoteConnected) {
                     pubmoteLastStatusTime = 0
                 } else {
                     pubmoteLastStatusTime = pubmoteLastStatusTime // Trigger binding re-evaluation
@@ -2648,6 +3473,17 @@ Item {
                     }
                 }
                 pubmoteVersionStr = newVersion;
+            } else if (str.startsWith("pairing-status")) {
+                var tokens = str.split(" ");
+                pubmotePairingState = Number(tokens[1]);
+            } else if (str.startsWith("input-state")) {
+                var tokens = str.split(" ");
+                pubmoteInputConnected = !!Number(tokens[1]);
+                pubmoteInputJsy = parseFloat(tokens[2]);
+                pubmoteInputJsx = parseFloat(tokens[3]);
+                pubmoteInputBtC = !!Number(tokens[4]);
+                pubmoteInputBtZ = !!Number(tokens[5]);
+                pubmoteInputRev = !!Number(tokens[6]);
             }
         }
     }

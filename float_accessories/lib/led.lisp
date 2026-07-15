@@ -1,78 +1,9 @@
 ;@const-symbol-strings
-;Buffers
-(def led-button-buffer)
-(def led-footpad-buffer)
-(def led-status-buffer)
-(def led-front-buffer)
-(def led-rear-buffer)
-(def led-combined-buffer)
 @const-start
 
-(def led-loop-delay)
-;config vars
-(def led-enabled)
-(def led-mode)
-(def led-mode-idle)
-(def led-mode-status)
-(def led-mode-startup)
-(def led-mode-button)
-(def led-mode-footpad)
-(def led-mall-grab-enabled)
-(def led-brake-light-enabled)
-(def led-brake-light-min-amps)
-(def idle-timeout)
-(def idle-timeout-shutoff)
-(def led-status-pin)
-(def led-status-num)
-(def led-status-type)
-(def led-status-reversed)
-(def led-front-pin)
-(def led-front-num)
-(def led-front-type)
-(def led-front-reversed)
-(def led-front-strip-type)
-(def led-rear-pin)
-(def led-rear-num)
-(def led-rear-type)
-(def led-rear-reversed)
-(def led-rear-strip-type)
-(def led-button-pin)
-(def led-button-strip-type)
-(def led-footpad-pin)
-(def led-footpad-num)
-(def led-footpad-type)
-(def led-footpad-reversed)
-(def led-footpad-strip-type)
-(def led-max-brightness)
-(def led-update-not-running)
-
-(def led-max-blend-count 0.0)  ; how many times to blend before new led buffer
-(def led-startup-timeout)
-(def led-dim-on-highbeam-ratio 0.0)
-(def led-status-strip-type)
-;runtime vars
-(def led-current-brightness 0.0)
-(def led-status-color '())
-(def led-front-color '())
-(def led-rear-color '())
-(def led-button-color '())
-(def led-footpad-color '())
-(def next-run-time)
-(def direction)
-(def led-mall-grab)
-(def prev-led-front-color '())
-(def prev-led-rear-color '())
-(def prev-led-footpad-color '())
-(def target-led-front-color '())
-(def target-led-rear-color '())
-(def target-led-footpad-color '())
-(def prev-led-button-color '())
-(def target-led-button-color '())
-(def combined-pins nil)
-(def led-fix 1)
-(def led-show-battery-charging 0)
-(def led-front-highbeam-pin)
-(def led-rear-highbeam-pin)
+(defun yield-led-fix () {
+    (yield led-fix)
+})
 
 (defun load-led-settings () {
     (setq led-enabled (get-config 'led-enabled))
@@ -131,6 +62,7 @@
     (def blend-count led-max-blend-count)
     (setq combined-pins nil)
     (setq led-current-brightness 0.0)
+    (setq led-smoothed-brightness 0.0)
     (setq led-status-color (mklist led-status-num 0))
     (setq led-front-color (mklist led-front-num 0))
     (setq led-rear-color (mklist led-rear-num 0))
@@ -228,6 +160,22 @@
         (if (> anim-time 100.0) (setq anim-time 0.0)) ; prevent overflow
         (if led-exit-flag {
             (break)
+        })
+
+        ; Reinitialize in-place when settings change (avoids stop/respawn RMT issues)
+        (if led-reinit-flag {
+            ; Clear all LEDs with the old config before reinitializing
+            (clear-leds)
+            (set-led-strip-color led-button-color 0x00)
+            (set-led-strip-color led-status-color 0x00)
+            (led-flush-buffers t)
+            (rgbled-deinit)
+            (if (and (= led-front-strip-type 7) (>= led-front-highbeam-pin 0)) (pwm-stop 0))
+            (if (and (= led-rear-strip-type 7) (>= led-rear-highbeam-pin 0)) (pwm-stop 1))
+            (load-led-settings)
+            (init-led-vars)
+            (setq led-loop-delay-sec (/ 1.0 led-loop-delay))
+            (setq led-reinit-flag nil)
         })
 
         (var idle-rpm-darkride 100)
@@ -349,9 +297,9 @@
     (reverse-led-strips)
     ;Enable/disable high beams and lets dim the rest of the leds if the high beams are on to help temps if on seperate pins
 
-    (var led-current-brightness-rear led-current-brightness)
-    (var led-current-brightness-front led-current-brightness)
-    (var led-dim-on-highbeam-brightness (* led-current-brightness led-dim-on-highbeam-ratio))
+    (var led-current-brightness-rear led-smoothed-brightness)
+    (var led-current-brightness-front led-smoothed-brightness)
+    (var led-dim-on-highbeam-brightness (* led-smoothed-brightness led-dim-on-highbeam-ratio))
     (var front-color-highbeam 0x00)
     (var rear-color-highbeam 0x00)
     (var led-current-front-color '())
@@ -493,14 +441,14 @@
     (if (and (> led-button-strip-type 0) (>= led-button-pin 0)) {
         (rgbled-color led-button-buffer 0 led-button-color led-current-brightness)
         (rgbled-init led-button-pin)
-        (yield led-fix)
+        (yield-led-fix)
         (rgbled-update led-button-buffer)
     })
 
     (if (and (> led-footpad-strip-type 0) (>= led-footpad-pin 0)) {
         (rgbled-color led-footpad-buffer 0 led-footpad-color led-current-brightness)
         (rgbled-init led-footpad-pin)
-        (yield led-fix)
+        (yield-led-fix)
         (rgbled-update led-footpad-buffer)
     })
 
@@ -510,7 +458,7 @@
         (var total-leds (length led-combined-color))
         (rgbled-color led-combined-buffer 0 led-combined-color led-current-brightness)
         (rgbled-init led-front-pin)
-        (yield led-fix)
+        (yield-led-fix)
         (rgbled-update led-combined-buffer)
     }{
         ;LED front/back are on same pin
@@ -519,7 +467,7 @@
             (var total-leds (length led-combined-color))
             (rgbled-color led-combined-buffer 0 led-combined-color led-current-brightness)
             (rgbled-init led-front-pin)
-            (yield led-fix)
+            (yield-led-fix)
             (rgbled-update led-combined-buffer)
         }{
             (if (and (> led-status-strip-type 0) (> led-rear-strip-type 0) (>= led-status-pin 0) (= led-status-pin led-rear-pin)) {
@@ -530,14 +478,14 @@
                 (var total-leds (length led-combined-color))
                 (rgbled-color led-combined-buffer 0 led-combined-color led-current-brightness)
                 (rgbled-init led-status-pin)
-                (yield led-fix)
+                (yield-led-fix)
                 (rgbled-update led-combined-buffer)
             }{
                 ; LED strips are on separate pins
                 (if (and (> led-status-strip-type 0) (>= led-status-pin 0)) {
                     (rgbled-color led-status-buffer 0 led-status-color (min led-brightness-status led-max-brightness))
                     (rgbled-init led-status-pin)
-                    (yield led-fix)
+                    (yield-led-fix)
                     (rgbled-update led-status-buffer)
                 })
                 (if (and (> led-rear-strip-type 0) (>= led-rear-pin 0) dont-freeze-update) {
@@ -547,7 +495,7 @@
                         (rgbled-color led-rear-buffer 0 led-current-rear-color led-current-brightness-rear)
                     )
                     (rgbled-init led-rear-pin)
-                    (yield led-fix)
+                    (yield-led-fix)
                     (rgbled-update led-rear-buffer)
                 })
             })
@@ -558,7 +506,7 @@
                     (rgbled-color led-front-buffer 0 led-current-front-color led-current-brightness-front)
                 )
                 (rgbled-init led-front-pin)
-                (yield led-fix)
+                (yield-led-fix)
                 (rgbled-update led-front-buffer)
             })
         })
@@ -620,10 +568,20 @@
     (if (= led-mall-grab 1) {
         (setq led-current-brightness (min led-brightness-status led-max-brightness))
     })
-    (if (or (and (>= last-activity-sec idle-timeout) (<= can-last-activity-time-sec 1)) (= state 5)) {
+    (if (and (>= last-activity-sec idle-timeout) (<= can-last-activity-time-sec 1)) {
         (setq current-led-mode led-mode-idle)
         (setq led-current-brightness (min led-brightness-idle led-max-brightness))
     })
+    (if (= state 5) {
+        (setq led-current-brightness (min led-brightness-idle led-max-brightness))
+    })
+
+    ; Smoothly interpolate led-smoothed-brightness toward the target led-current-brightness
+    (var brightness-step (* 5.0 (/ 1.0 led-loop-delay)))
+    (if (> led-current-brightness led-smoothed-brightness)
+        (setq led-smoothed-brightness (min led-current-brightness (+ led-smoothed-brightness brightness-step)))
+        (setq led-smoothed-brightness (max led-current-brightness (- led-smoothed-brightness brightness-step)))
+    )
 
     (if (and (<= (secs-since 0) led-startup-timeout) (not (running-state) )) { (setq current-led-mode led-mode-startup)})
     (var blend-ratio (/ blend-count led-max-blend-count))

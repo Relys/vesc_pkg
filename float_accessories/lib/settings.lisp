@@ -1,138 +1,6 @@
 ;@const-symbol-strings
 @const-start
-; Magic header
-(def magic-header 445i32)
-; Persistent settings
 
-; Format: (label . (offset type default-value current-value))
-(def eeprom-addrs '(
-    (magic                     . (0 i magic-header))
-    (crc                       . (1 i 61381))
-    (can-id                    . (2  i -1))  ; if can-id < 0 then it will scan for one and pick the first.
-    (accept-tos                . (3 b 0))
-    (led-enabled               . (4 b 0))
-    (bms-enabled               . (5 b 0))
-    (pubmote-enabled           . (6 b 0))
-    (led-on                    . (7 b 1))
-    (led-highbeam-on           . (8 b 1))
-    (led-mode                  . (9 i 0))
-    (led-mode-idle             . (10 i 5))
-    (led-mode-status           . (11 i 0))
-    (led-mode-startup          . (12 i 9))
-    (led-mode-button           . (13 i 0))
-    (led-mode-footpad          . (14 i 0))
-    (led-mall-grab-enabled     . (15 b 1))
-    (led-brake-light-enabled   . (16 b 1))
-    (led-brake-light-min-amps  . (17 f -4.0))
-    (idle-timeout              . (18 i 1))
-    (idle-timeout-shutoff      . (19 i 600))
-    (led-brightness            . (20 f 0.8))
-    (led-brightness-highbeam   . (21 f 0.8))
-    (led-brightness-idle       . (22 f 0.5))
-    (led-brightness-status     . (23 f 0.2))
-    (led-status-pin            . (24 i 7))
-    (led-status-num            . (25 i 10))
-    (led-status-type           . (26 i 0))
-    (led-status-reversed       . (27 b 1))
-    (led-front-pin             . (28 i 8))
-    (led-front-num             . (29 i 11))
-    (led-front-type            . (30 i 2))
-    (led-front-reversed        . (31 b 1))
-    (led-front-strip-type      . (32 b 0))
-    (led-rear-pin              . (33 i 9))
-    (led-rear-num              . (34 i 11))
-    (led-rear-type             . (35 i 2))
-    (led-rear-reversed         . (36 b 1))
-    (led-rear-strip-type       . (37 b 0))
-    (led-button-pin            . (38 b -1))
-    (led-button-strip-type     . (39 b 0))
-    (led-footpad-pin           . (40 i -1))
-    (led-footpad-num           . (41 i 0))
-    (led-footpad-type          . (42 i 0))
-    (led-footpad-reversed      . (43 b 0))
-    (led-footpad-strip-type    . (44 b 0))
-    (esp-now-remote-mac-a      . (45 i -1))
-    (esp-now-remote-mac-b      . (46 i -1))
-    (esp-now-secret-code       . (47 i -1))
-    (bms-rs485-di-pin          . (48 i 16))
-    (bms-rs485-ro-pin          . (49 i 8))
-    (bms-rs485-dere-pin        . (50 i 17))
-    (bms-wakeup-pin            . (51 i -1))
-    (bms-override-soc          . (52 i 0))
-    (bms-rs485-chip            . (53 b 1))
-    (bms-key-a                 . (54 i -1))
-    (bms-key-b                 . (55 i -1))
-    (bms-key-c                 . (56 i -1))
-    (bms-key-d                 . (57 i -1))
-    (bms-counter-a             . (58 i -1))
-    (bms-counter-b             . (59 i -1))
-    (bms-counter-c             . (60 i -1))
-    (bms-counter-d             . (61 i -1))
-    (led-loop-delay            . (62 i 20))
-    (bms-loop-delay            . (63 i 8))
-    (pubmote-loop-delay        . (64 i 20))
-    (can-loop-delay            . (65 i 8))
-    (led-max-blend-count       . (66 i 4))
-    (led-startup-timeout       . (67 i 20))
-    (led-dim-on-highbeam-ratio . (68 f 0.2))
-    (bms-type                  . (69 i 0))
-    (led-status-strip-type     . (70 i 0))
-    (bms-charge-only           . (71 b 0))
-    (led-fix                   . (72 i 100))
-    (led-show-battery-charging . (73 b 1))
-    (led-front-highbeam-pin    . (74 i -1))
-    (led-rear-highbeam-pin     . (75 i -1))
-    (bms-buff-size             . (76 i 128))
-    (led-max-brightness        . (77 f 0.8))
-    (soc-type                  . (78 i 0))
-    (cell-type                 . (79 i 0))
-    (led-update-not-running    . (80 b 0))
-    (log-enabled               . (81 b 0))
-    (log-rate                  . (82 f 2))
-    (log-append-gnss           . (83 b 0))
-    (humidity-enabled          . (84 b 0))
-    (humidity-sda-pin          . (85 i -1))
-    (humidity-slc-pin          . (86 i -1))
-))
-(def runtime-vals)
-(setq runtime-vals (mklist (length eeprom-addrs) -1))
-
-(def cfg-len (length eeprom-addrs))
-(def read-cfg-len 0)
-(def bms-context-id -1)
-(def bms-exit-flag nil)
-(def bms-last-activity-time (systime))
-(def pubmote-context-id -1)
-(def pubmote-exit-flag nil)
-(def pubmote-last-activity-time (systime))
-(def wifi-enabled-on-boot nil)
-(def led-context-id -1)
-(def led-exit-flag nil)
-(def led-last-activity-time (systime))
-(def can-context-id -1)
-(def can-last-activity-time (systime))
-(def bms-charge-state 0) ;0 if 100, 1 if 90
-(def log-context-id -1)
-
-; LED settings used by settings.lisp - needed otherwise they will be unbound
-(def led-on)
-(def led-highbeam-on)
-(def led-brightness 0.0)
-(def led-brightness-highbeam 0.0)
-(def led-brightness-idle 0.0)
-(def led-brightness-status 0.0)
-
-(def bms-status -1)
-(def bms-battery-type -1)
-(def bms-battery-cycles -1)
-
-(def humidity-context-id -1)
-
-; State
-(def log-running false)
-
-(def hum 0)
-(def hum-temp 0)
 
 (defun recv-control (in-led-on in-led-highbeam-on in-led-brightness in-led-brightness-highbeam in-led-brightness-idle in-led-brightness-status in-bms-charge-state) {
     (setq led-on (to-i in-led-on))
@@ -192,16 +60,13 @@
     in-log-enabled in-log-rate in-log-append-gnss in-humidity-enabled in-humidity-sda-pin in-humidity-slc-pin
 ) {
 
-    (if (or (!= (to-i in-led-enabled) (to-i (get-config 'led-enabled)))  (!= (to-i in-pubmote-enabled) (to-i (get-config 'pubmote-enabled))) (!= (to-i in-bms-enabled) (to-i (get-config 'bms-enabled)))){
-        (set-config 'led-enabled (to-i in-led-enabled))
-        (set-config 'bms-enabled (to-i in-bms-enabled))
-        (set-config 'pubmote-enabled (to-i in-pubmote-enabled))
-        (save-config)
-        (send-msg "Rebooting")
-        (reboot)
-    })
-    (var reboot-now nil)
-    (if (>= led-context-id 0) {
+    (var prev-led-enabled (get-config 'led-enabled))
+    (set-config 'led-enabled (to-i in-led-enabled))
+    (set-config 'bms-enabled (to-i in-bms-enabled))
+    (set-config 'pubmote-enabled (to-i in-pubmote-enabled))
+
+    ; Only stop LED loop if LEDs are being disabled
+    (if (and (>= led-context-id 0) (!= (to-i in-led-enabled) 1)) {
         (let ((start-time (systime)) (timeout-val 2000000)) ; 2 sec timeout
 
         (setq led-exit-flag t)
@@ -211,10 +76,10 @@
 
             ; Check if exited due to timeout
             (if led-exit-flag {
-                (send-msg "ERROR: LED loop did not exit in time. Rebooting...")
-                (setq reboot-now t)
+                (send-msg "WARNING: LED loop did not exit in time.")
             })
         )
+        (setq led-context-id -1)
     })
 
     (if (>= bms-context-id 0) {
@@ -227,8 +92,7 @@
 
             ; Check if exited due to timeout
             (if bms-exit-flag {
-                (send-msg "ERROR: BMS loop did not exit in time. Rebooting...")
-                (setq reboot-now t)
+                (send-msg "WARNING: BMS loop did not exit in time.")
             })
         )
     })
@@ -311,77 +175,57 @@
     (set-config 'log-rate (to-i in-log-rate))
     (set-config 'log-append-gnss (to-i in-log-append-gnss))
     (set-config 'humidity-enabled (to-i in-humidity-enabled))
-    (if (or (!= (to-i (get-config 'humidity-sda-pin)) (to-i in-humidity-sda-pin)) (!= (to-i (get-config 'humidity-slc-pin)) (to-i in-humidity-slc-pin))) (setq reboot-now t) )
+    ; Stop humidity loop if pins changed so it can be restarted with new config
+    (if (and (>= humidity-context-id 0) (or (!= (to-i (get-config 'humidity-sda-pin)) (to-i in-humidity-sda-pin)) (!= (to-i (get-config 'humidity-slc-pin)) (to-i in-humidity-slc-pin)))) {
+        (let ((start-time (systime)) (timeout-val 2000000))
+            (setq humidity-exit-flag t)
+            (loopwhile (and humidity-exit-flag (< (- (systime) start-time) timeout-val))
+                (yield 10000))
+            (if humidity-exit-flag {
+                (send-msg "WARNING: Humidity loop did not exit in time.")
+            })
+        )
+        (setq humidity-context-id -1)
+    })
     (set-config 'humidity-sda-pin (to-i in-humidity-sda-pin))
     (set-config 'humidity-slc-pin (to-i in-humidity-slc-pin))
 
 
-    (if (= in-led-enabled 1) {
-        (if (and (> in-led-front-strip-type 0) (>= in-led-front-pin 0)) {
-            (if (not-eq (first (trap (rgbled-init in-led-front-pin))) 'exit-ok) {
-                (send-msg "Invalid Pin: led-front-pin")
-            }{
-                (set-config 'led-front-pin (to-i in-led-front-pin))
-            })
-        })
+    (set-config 'led-status-pin (to-i in-led-status-pin))
+    (set-config 'led-front-pin (to-i in-led-front-pin))
+    (set-config 'led-rear-pin (to-i in-led-rear-pin))
+    (set-config 'led-button-pin (to-i in-led-button-pin))
+    (set-config 'led-footpad-pin (to-i in-led-footpad-pin))
+    (set-config 'led-front-highbeam-pin (to-i in-led-front-highbeam-pin))
+    (set-config 'led-rear-highbeam-pin (to-i in-led-rear-highbeam-pin))
 
-        (if (and (> in-led-rear-strip-type 0) (>= in-led-rear-pin 0)) {
-            (if (not-eq (first (trap (rgbled-init in-led-rear-pin))) 'exit-ok) {
-                (send-msg "Invalid Pin: led-rear-pin")
-            }{
-                (set-config 'led-rear-pin (to-i in-led-rear-pin))
-            })
-        })
-
-        (if (and (> in-led-status-strip-type 0) (>= in-led-status-pin 0)) {
-            (if (not-eq (first (trap (rgbled-init in-led-status-pin))) 'exit-ok) {
-                (send-msg "Invalid Pin: led-status-pin")
-            }{
-                (set-config 'led-status-pin (to-i in-led-status-pin))
-            })
-        })
-
-        (if (and (> in-led-button-strip-type 0) (>= in-led-button-pin 0)) {
-            (if (not-eq (first (trap (rgbled-init in-led-button-pin))) 'exit-ok) {
-                (send-msg "Invalid Pin: led-button-pin")
-            }{
-                (set-config 'led-button-pin (to-i in-led-button-pin))
-            })
-        })
-
-        (if (and (> in-led-footpad-strip-type 0) (>= in-led-footpad-pin 0)) {
-            (if (not-eq (first (trap (rgbled-init in-led-footpad-pin))) 'exit-ok) {
-                (send-msg "Invalid Pin: led-footpad-pin")
-            }{
-                (set-config 'led-footpad-pin (to-i in-led-footpad-pin))
-            })
-        })
-
-        (if (and (= in-led-front-strip-type 7) (>= in-led-front-highbeam-pin 0)) {
-            (if (not-eq (first (trap (pwm-start 2000 0.0 0 in-led-front-highbeam-pin 12))) 'exit-ok) {
-                (send-msg "Invalid Pin: led-front-highbeam-pin")
-            }{
-                (set-config 'led-front-highbeam-pin (to-i in-led-front-highbeam-pin))
-            })
-        })
-
-        (if (and (= in-led-rear-strip-type 7) (>= in-led-rear-highbeam-pin 0)) {
-            (if (not-eq (first (trap (pwm-start 2000 0.0 1 in-led-rear-highbeam-pin 12))) 'exit-ok) {
-                (send-msg "Invalid Pin: led-rear-highbeam-pin")
-            }{
-                (set-config 'led-rear-highbeam-pin (to-i in-led-rear-highbeam-pin))
-            })
-        })
+    ; If LED loop is running and LEDs remain enabled, reinit in-place
+    (if (and (>= led-context-id 0) (= (get-config 'led-enabled) 1)) {
+        (setq led-reinit-flag t)
     })
+    ; If LEDs are newly enabled, spawn the loop
+    (if (and (= led-context-id -1) (= (get-config 'led-enabled) 1)) {
+        (setq led-context-id (spawn led-loop))
+    })
+    (setq bms-context-id (if (= (get-config 'bms-enabled) 1) (spawn bms-loop) -1))
 
-    (if (not reboot-now) (setq led-context-id (if (= (get-config 'led-enabled) 1) (spawn led-loop) -1)))
-    (if (not reboot-now) (setq bms-context-id (if (= (get-config 'bms-enabled) 1) (spawn bms-loop) -1)))
-
-    (if (= in-humidity-enabled 1) {
+    (if (= (to-i in-humidity-enabled) 1) {
         (if (= humidity-context-id -1) (setq humidity-context-id (spawn humidity-loop)))
     })
 
-    (if (= in-pubmote-enabled 1) {
+    ; Stop pubmote if it was running and is now disabled
+    (if (and (>= pubmote-context-id 0) (!= (to-i in-pubmote-enabled) 1)) {
+        (let ((start-time (systime)) (timeout-val 2000000))
+            (setq pubmote-exit-flag t)
+            (loopwhile (and pubmote-exit-flag (< (- (systime) start-time) timeout-val))
+                (yield 10000))
+            (if pubmote-exit-flag {
+                (send-msg "WARNING: Pubmote loop did not exit in time.")
+            })
+        )
+        (setq pubmote-context-id -1)
+    })
+    (if (= (to-i in-pubmote-enabled) 1) {
         (if (= pubmote-context-id -1) (setq pubmote-context-id (spawn pubmote-loop)))
     })
 
@@ -397,7 +241,7 @@
 
     (save-config)
     (send-config)
-    (if reboot-now {(send-msg "Rebooting") (reboot)})
+
 })
 
 (defun send-keys (key-list counter-list) {
@@ -574,7 +418,7 @@
     (setq status-string (str-merge status-string (str-from-n bms-status "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-type "%d ")))
     (setq status-string (str-merge status-string (str-from-n bms-battery-cycles "%d ")))
-    (setq status-string (str-merge status-string (str-from-n (if wifi-enabled-on-boot (wifi-get-chan) -1) "%d ")))
+    (setq status-string (str-merge status-string (str-from-n (if (> (conf-get 'wifi-mode) 0) (wifi-get-chan) -1) "%d ")))
     (setq status-string (str-merge status-string (str-from-n hum "%.0f ")))
     (setq status-string (str-merge status-string (str-from-n hum-temp "%.2f ")))
     (setq status-string (str-merge status-string (str-from-n (get-bms-val 'bms-hum) "%.0f ")))
@@ -583,8 +427,19 @@
     (send-data status-string)
 
     (if (= (is-pubmote-connected) 1) {
-        (send-data (str-merge "pubmote-info " (to-str pubmote-version-major) "." (to-str pubmote-version-minor) "." (to-str pubmote-version-patch)))
+        (send-data (str-merge "pubmote-info " (to-str (ix pubmote-version 0)) "." (to-str (ix pubmote-version 1)) "." (to-str (ix pubmote-version 2))))
     })
+})
+
+(defun input-state () {
+    (var input-string "input-state ")
+    (setq input-string (str-merge input-string (str-from-n (is-pubmote-connected) "%d ")))
+    (setq input-string (str-merge input-string (str-from-n pubmote-last-jsy "%.3f ")))
+    (setq input-string (str-merge input-string (str-from-n pubmote-last-jsx "%.3f ")))
+    (setq input-string (str-merge input-string (str-from-n pubmote-last-bt-c "%d ")))
+    (setq input-string (str-merge input-string (str-from-n pubmote-last-bt-z "%d ")))
+    (setq input-string (str-merge input-string (str-from-n pubmote-last-is-rev "%d")))
+    (send-data input-string)
 })
 
 @const-end

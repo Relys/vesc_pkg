@@ -27,11 +27,22 @@
     )
 )
 
+; Dispatch handlers are wrapped in trap so a malformed packet can never kill
+; the event thread - an unhandled eval error would otherwise cost a >=1s
+; control/telemetry blackout while the restart monitor respawns it.
+(defun dispatch-trapped (name res)
+    (if (eq (ix res 0) 'exit-error)
+        (print (str-merge name " error: " (to-str (ix res 1))))
+    )
+)
+
 (defun event-handler ()
     (loopwhile t
         (recv
-            ((event-esp-now-rx (? src) (? des) (? data) (? rssi)) (pubmote-rx src des data rssi))
-            ((event-data-rx . (? data)) (float-command-rx data))
+            ((event-esp-now-rx (? src) (? des) (? data) (? rssi))
+                (dispatch-trapped "pubmote-rx" (trap (pubmote-rx src des data rssi))))
+            ((event-data-rx . (? data))
+                (dispatch-trapped "command-rx" (trap (command-rx data))))
             (_ nil)
         )
     )
@@ -63,7 +74,7 @@
                      (to-u32 (ix byte-list 3)))))
 })
 (defunret unpack-uint32-to-bytes (packed-value) {
-  (return (list (to-byte (shr packed-value 24))
+  (return (list (to-byte (bitwise-and (shr packed-value 24) 0xFF))
                 (to-byte (shr (bitwise-and packed-value 0xFF0000) 16))
                 (to-byte (shr (bitwise-and packed-value 0xFF00) 8))
                 (to-byte (bitwise-and packed-value 0xFF))))
@@ -109,6 +120,10 @@
         (var rx-si7021 (bufcreate 4))
         (var rx-aht20 (bufcreate 6))
         (loopwhile t {
+            (if humidity-exit-flag {
+                (break)
+            })
+
             (if has-si7021 {
                 (i2c-tx-rx 0x40 '() rx-si7021)
                 (i2c-tx-rx 0x40 (list 0x0F 0x01))
@@ -144,6 +159,7 @@
         })
         (free rx-si7021)
         (free rx-aht20)
+        (setq humidity-exit-flag nil)
     })
 })
 
@@ -178,7 +194,7 @@
 (defun get-var (i) i)
 
 (defun get-version () {
-    (list 3 2 0) ; Major, Minor, Patch
+    (list 3 4 0) ; Major, Minor, Patch
 })
 
 (defun is-606-or-newer () {

@@ -2,103 +2,87 @@
 
 @const-start
 
-(def pubmote-loop-delay)  ; Loop delay in microseconds (100ms)
-(def pairing-state 0)
-(def esp-now-remote-mac '())
-(def pubmote-pairing-timer 31)
-(def pubmote-pairing-timer-timeout 30) ; How many seconds to wait before aborting pairing
-(def uni-mac '(255 255 255 255 255 255)) ; Universal mac (all devices)
-(def channel-locked 0)
-(def channel-locked-timeout 10) ; How many seconds of no activity to wait before unlocking locked wifi channel
-(def pubmote-version-major 0)
-(def pubmote-version-minor 0)
-(def pubmote-version-patch 0)
 
-(def rem-cmds '(
-    ; Remote version commands
-    (REM_VERSION . 0)
-    ; Receiver version commands
-    (REM_VERSION_REC. 5)
-    ; Bonding commands
-    (REM_PAIR_INIT . 10)
-    (REM_PAIR_BOND . 11)
-    (REM_PAIR_COMPLETE . 12)
-    ; Remote specific commands
-    (REM_SET_CORE_DATA . 100)
-    ; Receiver specific commands
-    (REM_SET_INPUT_STATE . 150)
-))
+
+(defun setup-pubmote (vehicle-type on-control get-telemetry send-msg-cb get-cfg-cb set-cfg-cb save-cfg-cb) {
+    (setq pubmote-vehicle-type vehicle-type)
+    (setq pubmote-on-control on-control)
+    (setq pubmote-get-telemetry get-telemetry)
+    (setq pubmote-send-msg-cb send-msg-cb)
+    (setq pubmote-get-config get-cfg-cb)
+    (setq pubmote-set-config set-cfg-cb)
+    (setq pubmote-save-config save-cfg-cb)
+})
+
+
+(defun set-pairing-state (new-state) {
+    (setq pairing-state new-state)
+    (send-data (str-merge "pairing-status " (to-str new-state)))
+})
 
 (defunret init-pubmote () {
-    ; Escape without wifi
-    (if (not wifi-enabled-on-boot) {
-        (send-msg "WiFi was disabled on boot. Please enable and reboot to use Pubmote.")
-        (return false)
+    (setq wifi-enabled-on-boot (> (conf-get 'wifi-mode) 0))
+    (setq pubmote-remote-mac (append (unpack-uint32-to-bytes (pubmote-get-cfg 'pubmote-remote-mac-a)) (take (unpack-uint32-to-bytes (pubmote-get-cfg 'pubmote-remote-mac-b)) 2)))
+    ; A remote paired over BLE is stored with the all-zeros placeholder MAC
+    (setq pubmote-ble-paired (= (pubmote-get-cfg 'pubmote-remote-mac-a) 0))
+    (if pubmote-ble-paired {
+        (print "Pubmote BLE paired with remote")
+        ; (ble-set-max-clients 2)
+        ; (print "BLE max clients set to 2")
+    } {
+        (print "Pubmote ESP-NOW paired with remote:" pubmote-remote-mac)
     })
-
-    (setq esp-now-remote-mac (append (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-a)) (take (unpack-uint32-to-bytes (get-config 'esp-now-remote-mac-b)) 2)))
 
     ; Read as bytes, convert to i so we can compare lists
-    (loopfor i 0 (< i (length esp-now-remote-mac)) (+ i 1) {
-        (setix esp-now-remote-mac i (to-i (ix esp-now-remote-mac i)))
+    (loopfor i 0 (< i (length pubmote-remote-mac)) (+ i 1) {
+        (setix pubmote-remote-mac i (to-i (ix pubmote-remote-mac i)))
     })
 
-    (esp-now-start)
-    (esp-now-del-peer esp-now-remote-mac)
-    (esp-now-add-peer esp-now-remote-mac)
-    (esp-now-del-peer uni-mac)
-    (esp-now-add-peer uni-mac)
+    (if (not wifi-enabled-on-boot) {
+        (pubmote-send-msg "WiFi disabled. Pubmote running in BLE-only mode.")
+    } {
+        (esp-now-start)
+        ; Skip the peer registration for BLE-paired remotes (placeholder MAC)
+        (if (is-valid-espnow-mac pubmote-remote-mac) {
+            (esp-now-del-peer pubmote-remote-mac)
+            (esp-now-add-peer pubmote-remote-mac)
+        })
+        (esp-now-del-peer uni-mac)
+        (esp-now-add-peer uni-mac)
+    })
     (return true)
 })
 
 (defunret pair-pubmote (pairing) {
-    (if (= (conf-get 'wifi-mode) 0) {
-        (send-msg "WiFi is disabled. Please enable and reboot.")
-        (return false)
-    })
-
     (cond
         ((>= pairing 0) {
-            (set-config 'esp-now-secret-code (to-i32 pairing))
+            (pubmote-set-cfg 'pubmote-secret-code (to-i32 pairing))
             (setq pubmote-pairing-timer (systime))
-            (setq pairing-state 1)
+            (set-pairing-state PAIR_STATE_INITIATED)
         })
 
         ; Pairing accepted
         ((= pairing -1) {
-            (set-config 'esp-now-remote-mac-a (pack-bytes-to-uint32 (take esp-now-remote-mac 4)))
-            (set-config 'esp-now-remote-mac-b (pack-bytes-to-uint32 (append (drop esp-now-remote-mac 4) '(0 0))))
-            (atomic {
-                (write-val-eeprom 'esp-now-remote-mac-a (get-config 'esp-now-remote-mac-a))
-                (write-val-eeprom 'esp-now-remote-mac-b (get-config 'esp-now-remote-mac-b))
-                (write-val-eeprom 'esp-now-secret-code (get-config 'esp-now-secret-code))
-                (write-val-eeprom 'crc (config-crc cfg-len))
+            (if (= (length pubmote-remote-mac) 6) {
+                (pubmote-set-cfg 'pubmote-remote-mac-a (pack-bytes-to-uint32 (take pubmote-remote-mac 4)))
+                (pubmote-set-cfg 'pubmote-remote-mac-b (pack-bytes-to-uint32 (append (drop pubmote-remote-mac 4) '(0 0))))
             })
+            (pubmote-save-cfg)
             (init-pubmote)
-            (var tmpbuf (bufcreate 2))
-            (bufset-u8 tmpbuf 0 (assoc rem-cmds 'REM_PAIR_COMPLETE))
-            (bufset-u8 tmpbuf 1 1)
-            (print "Sending pairing success message")
-            (esp-now-send esp-now-remote-mac tmpbuf)
-            (free tmpbuf)
-            (setq pairing-state 0)
+            (setq pubmote-pair-complete-status 1)
+            (setq pubmote-send-pair-complete-retries 3)
+            (set-pairing-state PAIR_STATE_IDLE)
         })
 
         ; Pairing rejected
         ((= pairing -2) {
-            (set-config 'esp-now-remote-mac-a -1)
-            (atomic {
-                (write-val-eeprom 'esp-now-remote-mac-a (get-config 'esp-now-remote-mac-a) -1)
-                (write-val-eeprom 'crc (config-crc cfg-len))
-            })
-            (var tmpbuf (bufcreate 2))
-            (bufset-u8 tmpbuf 0 (to-byte (assoc rem-cmds 'REM_PAIRING_COMPLETE)))
-            (bufset-u8 tmpbuf 1 0)
-            (print "Sending pairing rejected message")
-            (esp-now-send esp-now-remote-mac tmpbuf)
-            (free tmpbuf)
-            (setq esp-now-remote-mac '())
-            (setq pairing-state 0)
+            (pubmote-set-cfg 'pubmote-remote-mac-a -1)
+            (pubmote-save-cfg)
+            
+            (setq pubmote-pair-complete-status 0)
+            (setq pubmote-send-pair-complete-retries 3)
+            
+            (set-pairing-state PAIR_STATE_IDLE)
 
             ; Unlock wifi channel hopping
             (should-unlock-channel pubmote-last-activity-time)
@@ -108,51 +92,15 @@
     (return true)
 })
 
-(defun lock-channel (reason) {
-    (print (str-merge "Channel switching disabled. Reason: " reason))
-    (setq channel-locked (wifi-get-chan))
-    (wifi-disconnect)
-    (wifi-auto-reconnect nil)
-})
-
-(defun unlock-channel (reason) {
-    (print (str-merge "Channel switching enabled. Reason: " reason))
-    (setq channel-locked 0)
-    (wifi-auto-reconnect true)
-    (wifi-connect (conf-get `wifi-sta-ssid) (conf-get `wifi-sta-key))
-})
-
-(defun is-station-mode () {
-    (eq (conf-get 'wifi-mode) 1)
-})
-
-(defun is-wifi-connected () {
-    (eq (wifi-status) 'connected)
-})
-
-(defun should-lock-channel () {
-    ; Channel is not locked
-    ; Station mode
-    ; Wifi is not connected
-    (and (eq channel-locked 0) (is-station-mode) (not (is-wifi-connected)))
-})
-
-(defun should-unlock-channel (last-activity-time) {
-    ; Channel is locked
-    ; Station mode
-    ; Last activity time is not set or more than set time passed since last rx
-    (if (and (> channel-locked 0) (is-station-mode) (> (secs-since last-activity-time) channel-locked-timeout)) {
-        (unlock-channel (str-from-n pubmote-last-activity-time "Last activity time greater than set time"))
-    })
-})
-
-(defun should-send-message () {
-    (and (= pairing-state 0) (!= (get-config 'esp-now-remote-mac-a) -1) (>= (get-config 'can-id) 0))
-})
 
 (defun pubmote-loop () {
     (if (init-pubmote) {
-        (setq pubmote-loop-delay (get-config 'pubmote-loop-delay))
+        (setq pubmote-loop-delay (pubmote-get-cfg 'pubmote-loop-delay))
+        ; A zero/negative configured rate would divide-by-zero below and put
+        ; the loop into a crash-restart cycle
+        (if (< pubmote-loop-delay 1) {
+            (setq pubmote-loop-delay 20)
+        })
         (var next-run-time (secs-since 0))
         (var loop-start-time 0)
         (var loop-end-time 0)
@@ -160,7 +108,7 @@
         (var data (bufcreate 33))
 
         (loopwhile t {
-            (if (get-config 'pubmote-enabled) {
+                (if (pubmote-get-cfg 'pubmote-enabled) {
                 ; Check last pubmote activity
                 (should-unlock-channel pubmote-last-activity-time)
 
@@ -171,64 +119,95 @@
                     (break)
                 })
 
+                ; Send pair complete packets asynchronously without blocking QML
+                (if (> pubmote-send-pair-complete-retries 0) {
+                    (var tmpbuf (bufcreate 2))
+                    (bufset-u8 tmpbuf 0 REM_PAIR_COMPLETE)
+                    (bufset-u8 tmpbuf 1 pubmote-pair-complete-status)
+                    (print "Sending pairing complete message to:" pubmote-remote-mac)
+                    (pubmote-send-packet pubmote-remote-mac tmpbuf nil)
+                    (if (connected-ble) {
+                        (pubmote-send-packet '() tmpbuf t)
+                    })
+                    (free tmpbuf)
+                    (setq pubmote-send-pair-complete-retries (- pubmote-send-pair-complete-retries 1))
+
+                    (if (= pubmote-send-pair-complete-retries 0) {
+                        ; Only wipe the MAC if no new pairing handshake has
+                        ; started in the meantime (the deferred wipe must not
+                        ; clobber a fresh bond)
+                        (if (and (= pubmote-pair-complete-status 0) (= pairing-state PAIR_STATE_IDLE)) {
+                            (setq pubmote-remote-mac '())
+                        })
+                    })
+                })
+
                 ; Timeout pairing process after set time has passed
-                (if (and (> (secs-since pubmote-pairing-timer) pubmote-pairing-timer-timeout) (>= pairing-state 1)) {
+                (if (and (> (secs-since pubmote-pairing-timer) pubmote-pairing-timer-timeout) (>= pairing-state PAIR_STATE_INITIATED)) {
                     (pair-pubmote -2)
                 })
 
                 ; Pairing search 
-                (if (= pairing-state 1) {
+                (if (= pairing-state PAIR_STATE_INITIATED) {
                     ; Update last activity time for pairing duration
-                    (print "Set last activity time from pubmote-loop: Pairing search")
                     (setq pubmote-last-activity-time (systime))
 
-                    (if (should-lock-channel) {
-                        (lock-channel "Begin pairing")
+                    (if (> (- (systime) pubmote-last-pairing-broadcast) 50) {
+                        (setq pubmote-last-pairing-broadcast (systime))
+                        (if (should-lock-channel) {
+                            (lock-channel "Begin pairing")
+                        })
+
+                        (var pairing-data (bufcreate 8))
+
+                        (bufset-u8 pairing-data 0 REM_PAIR_INIT)
+                        (var local-mac (get-mac-addr))
+
+                        (looprange i 0 6 {
+                            (bufset-u8 pairing-data (+ i 1) (ix local-mac i))
+                        })
+
+                        ; Append our actual WiFi channel to prevent race condition with channel switching or channel bleed
+                        ; send 0 there - BLE pairing ignores the byte
+                        (bufset-u8 pairing-data 7 (if wifi-enabled-on-boot (wifi-get-chan) 0))
+
+                        (pubmote-send-packet uni-mac pairing-data nil)
+                        (if (connected-ble) {
+                            (pubmote-send-packet '() pairing-data t)
+                        })
+                        (free pairing-data)
                     })
-
-                    (var pairing-data (bufcreate 7))
-
-                    (bufset-u8 pairing-data 0 (to-byte (assoc rem-cmds 'REM_PAIR_INIT)))
-                    (var local-mac (get-mac-addr))
-
-                    (looprange i 0 (- (buflen pairing-data) 1) {
-                        (bufset-u8 pairing-data (+ i 1) (ix local-mac i))
-                    })
-
-                    ; (bufset-u8 data 0 69)
-                    ; (print "Sending pairing mac address")
-                    (esp-now-send uni-mac pairing-data)
-                    (free pairing-data)
                 })
 
                 ; Bond in progress
-                (if (= pairing-state 2) {
+                (if (= pairing-state PAIR_STATE_BONDING) {
                     ; Update last activity time for pairing duration
-                    (print "Set last activity time from pubmote-loop: Bond in progress")
                     (setq pubmote-last-activity-time (systime))
                 })
 
                 ; Connected, send data
-                (if (should-send-message) {                
-                    (bufset-u8 data 0 (to-byte (assoc rem-cmds 'REM_SET_CORE_DATA)))
-                    (bufset-i32 data 1 (get-config 'esp-now-secret-code))
-                    (bufset-u8 data 5 fault-code)
-                    (bufset-i16 data 6 (floor (* pitch-angle 10)))
-                    (bufset-i16 data 8 (floor (* roll-angle 10)))
-                    (bufset-u8 data 10 state)
-                    (bufset-u8 data 11 switch-state)
-                    (bufset-i16 data 12 (floor (* vin 10)))
-                    (bufset-i16 data 14 (floor rpm))
-                    (bufset-i16 data 16 (floor (* speed 10)))
-                    (bufset-i16 data 18 (floor (* tot-current 10)))
-                    (bufset-u8 data 20 (floor (* (+ (abs duty-cycle-now) 0.5) 100)))
-                    (bufset-f32 data 21 distance-abs 'little-endian)
-                    (bufset-u8 data 25 (floor (* fet-temp-filtered 2)))
-                    (bufset-u8 data 26 (floor (* motor-temp-filtered 2)))
-                    (bufset-u32 data 27 odometer)
-                    (bufset-u8 data 31 (floor (* battery-percent-remaining 200)))
-                    ; (print "Sending board state to remote")
-                    (esp-now-send esp-now-remote-mac data)
+                (if (should-send-message) {
+                    (bufset-u8 data 0 REM_SET_CORE_DATA)
+                    (bufset-i32 data 1 (pubmote-get-cfg 'pubmote-secret-code))
+
+                    (if (not-eq pubmote-get-telemetry nil) {
+                        (serialize-telemetry data (pubmote-get-telemetry))
+                    })
+
+                    (if (> (- (systime) last-log-time-telemetry-tx) 2000) {
+                        (setq last-log-time-telemetry-tx (systime))
+                    })
+                    ; Push telemetry on the transport the remote paired with.
+                    ; Pushing over BLE (rather than only replying to input
+                    ; packets) keeps the remote's connection state solid even
+                    ; when a single packet is lost.
+                    (if pubmote-ble-paired {
+                        (if (connected-ble) {
+                            (pubmote-send-packet '() data t)
+                        })
+                    } {
+                        (pubmote-send-packet pubmote-remote-mac data nil)
+                    })
                 })
 
                 (setq loop-end-time (secs-since 0))
@@ -250,104 +229,147 @@
     })
 })
 
-(defun should-process-message (src data) {
-    (and (= pairing-state 0) (eq esp-now-remote-mac src) (= (bufget-i32 data 1 'little-endian) (get-config 'esp-now-secret-code)))
-})
 
-(defun reset-last-activity-time () {
-    (setq pubmote-last-activity-time (systime))
+(defun process-pubmote-packet (data is-ble) {
+    (var cmd (bufget-u8 data 0))
+
+    (cond
+        ((= cmd REM_VERSION) {
+            (if (= (buflen data) 8) {
+                (reset-last-activity-time)
+                (setq pubmote-version (list (bufget-u8 data 5) (bufget-u8 data 6) (bufget-u8 data 7)))
+                (print (str-merge (if is-ble "Remote BLE version: " "Remote version: ") (to-str (ix pubmote-version 0)) "." (to-str (ix pubmote-version 1)) "." (to-str (ix pubmote-version 2))))
+            })
+        })
+
+        ((= cmd REM_VERSION_REC) {
+            (reset-last-activity-time)
+            (var tmpbuf (bufcreate 8))
+            (bufset-u8 tmpbuf 0 REM_VERSION_REC)
+            (bufset-i32 tmpbuf 1 (pubmote-get-cfg 'pubmote-secret-code))
+            (bufset-u16 tmpbuf 5 pubmote-api-version 'little-endian)
+            (bufset-u8 tmpbuf 7 pubmote-vehicle-type)
+
+            (pubmote-send-packet (if is-ble '() pubmote-remote-mac) tmpbuf is-ble)
+            (free tmpbuf)
+        })
+
+        ((= cmd REM_SET_INPUT_STATE) {
+            (if (> (- (systime) last-log-time-telemetry-rx) 2000) {
+                (setq last-log-time-telemetry-rx (systime))
+            })
+            (if (= (buflen data) 17) {
+                (reset-last-activity-time)
+
+                (var jsy (bufget-f32 data 5 'little-endian))
+                (var jsx (bufget-f32 data 9 'little-endian))
+                (var bt-c (bufget-u8 data 13))
+                (var bt-z (bufget-u8 data 14))
+                (var is-rev (bufget-u8 data 15))
+
+                (if (not-eq pubmote-on-control nil) {
+                    (pubmote-on-control jsy jsx bt-c bt-z is-rev)
+                })
+            })
+        })
+
+        (t {
+            (if (not is-ble) {
+                (print (str-join (list "No command found: " (to-str cmd))))
+            })
+        })
+    )
 })
 
 (defun pubmote-rx (src des data rssi) {
-    (if (and (get-config 'pubmote-enabled) wifi-enabled-on-boot) {
-        (if (should-lock-channel) {
-            ; Update last activity time in case it does not establish a connection
-            (setq pubmote-last-activity-time (systime))
+    (if (and (pubmote-get-cfg 'pubmote-enabled) wifi-enabled-on-boot) {
+        ; Verify and strip PUBMOTE_MAGIC
+        (if (and (> (buflen data) 1) (= (bufget-u8 data 0) PUBMOTE_MAGIC)) {
+            (bufcpy data 0 data 1 (-(buflen data) 1))
+            (buf-resize data -1)
 
-            (lock-channel "ESP-NOW packet received")
-        })
+            (var cmd (bufget-u8 data 0))
+            (if (should-process-message src data) {
+                ; Only lock the wifi channel for traffic from our paired
+                ; remote (or during pairing below) - otherwise any device
+                ; sending the magic byte could stall our wifi reconnection
+                (if (should-lock-channel) {
+                    ; Update last activity time in case it does not establish a connection
+                    (setq pubmote-last-activity-time (systime))
 
-        (var cmd (bufget-u8 data 0))
-
-        (match (cossa rem-cmds cmd)
-            (REM_VERSION {
-                (if (and (should-process-message src data) (= (buflen data) 8)) {
-                    (reset-last-activity-time)
-
-                    (setq pubmote-version-major (bufget-u8 data 5))
-                    (setq pubmote-version-minor (bufget-u8 data 6))
-                    (setq pubmote-version-patch (bufget-u8 data 7))
-                    (print (str-merge "Remote version: " (to-str pubmote-version-major) "." (to-str pubmote-version-minor) "." (to-str pubmote-version-patch)))
+                    (lock-channel "ESP-NOW packet received")
                 })
 
-            })
+                (process-pubmote-packet data nil)
+            } {
+                ; ESP-NOW specific pairing. Also re-respond while BONDING:
+                ; the remote may have missed our first response (or retried
+                ; pairing), and refusing to repeat it deadlocks the handshake
+                ; until the pairing timeout expires.
+                (if (= cmd REM_PAIR_BOND) {
+                    (if (or (= pairing-state PAIR_STATE_INITIATED) (and (= pairing-state PAIR_STATE_BONDING) (eq pubmote-remote-mac src))) {
+                        (setq pubmote-remote-mac src)
+                        (esp-now-add-peer pubmote-remote-mac)
+                        (var tmpbuf (bufcreate 5))
+                        (bufset-u8 tmpbuf 0 REM_PAIR_BOND)
+                        (bufset-i32 tmpbuf 1 (pubmote-get-cfg 'pubmote-secret-code))
 
-            (REM_VERSION_REC {
-                (if (should-process-message src data) {
-                    (reset-last-activity-time)
+                        (print "Responding with pairing code")
+                        (pubmote-send-packet pubmote-remote-mac tmpbuf nil)
+                        (free tmpbuf)
+                        (esp-now-del-peer pubmote-remote-mac)
 
-                    (var tmpbuf (bufcreate 8))
-                    (bufset-u8 tmpbuf 0 (to-byte (assoc rem-cmds 'REM_VERSION_REC)))
-                    (bufset-i32 tmpbuf 1 (get-config 'esp-now-secret-code))
-
-                    (var version (get-version))
-                    (bufset-u8 tmpbuf 5 (first version))
-                    (bufset-u8 tmpbuf 6 (second version))
-                    (bufset-u8 tmpbuf 7 (third version))
-
-                    (esp-now-send esp-now-remote-mac tmpbuf)
-                    (free tmpbuf)
-                })
-            })
-
-            ; Bonding command
-            (REM_PAIR_BOND {
-                (if (= pairing-state 1) {
-                    ; Add the peer and save
-                    (setq esp-now-remote-mac src)
-                    (esp-now-add-peer esp-now-remote-mac)
-                    (var tmpbuf (bufcreate 5))
-                    (bufset-u8 tmpbuf 0 (to-byte (assoc rem-cmds 'REM_PAIR_BOND)))
-                    (bufset-i32 tmpbuf 1 (get-config 'esp-now-secret-code))
-
-                    ; Send pairing code
-                    (print "Responding with pairing code")
-                    (esp-now-send esp-now-remote-mac tmpbuf)
-                    (free tmpbuf)
-                    (esp-now-del-peer esp-now-remote-mac)
-
-                    ; Set pairing state to bonding
-                    (setq pairing-state 2)
-                })
-            })
-
-            (REM_SET_INPUT_STATE {
-                ; Remote is paired and data was received
-                (if (and (should-process-message src data) (= (buflen data) 17)) {
-                    (reset-last-activity-time)
-
-                    ;(print (list "Received" src des data rssi))
-                    (var jsy (bufget-f32 data 5 'little-endian))
-                    (var jsx (bufget-f32 data 9 'little-endian))
-                    (var bt-c (bufget-u8 data 13))
-                    (var bt-z (bufget-u8 data 14))
-                    (var is-rev (bufget-u8 data 15))
-                    ; (print (list jsy jsx bt-c bt-z is-rev))
-                    ; (rcode-run-noret (get-config 'can-id) `(set-remote-state ,jsy ,jsx ,bt-c ,bt-z ,is-rev))
-
-                    (if (>= (get-config 'can-id) 0) {
-                        (can-cmd (get-config 'can-id) (str-replace (to-str(list jsy jsx bt-c bt-z is-rev)) "(" "(set-remote-state "))
+                        (set-pairing-state PAIR_STATE_BONDING)
                     })
-                } {
-                   (print "Conditions not met for set remote state")
                 })
             })
+        })
+    })
+})
 
-            ; No matching command
-            (_ {
-            (print (str-join (list "No command found: " (to-str cmd))))
+(defun pubmote-ble-rx (data) {
+    (if (pubmote-get-cfg 'pubmote-enabled) {
+        ; Verify and strip PUBMOTE_MAGIC
+        (if (and (> (buflen data) 1) (= (bufget-u8 data 0) PUBMOTE_MAGIC)) {
+            (var payload-len (- (buflen data) 1))
+            (var payload (bufcreate payload-len))
+            (bufcpy payload 0 data 1 payload-len)
+
+            (var cmd (bufget-u8 payload 0))
+            ; BLE doesn't check src/mac, but we verify pairing-state and secret code
+            (if (and (= pairing-state PAIR_STATE_IDLE) (>= payload-len 5) (= (bufget-i32 payload 1 'little-endian) (pubmote-get-cfg 'pubmote-secret-code))) {
+                (process-pubmote-packet payload t)
+            } {
+                ; BLE pairing request
+                (if (= cmd REM_PAIR_BOND) {
+                    (print "pubmote-ble-rx: Received REM_PAIR_BOND")
+                    ; Respond while INITIATED, or while BONDING if the bond in
+                    ; progress is already a BLE one (all-zeros MAC): the remote
+                    ; may have missed our first response, and refusing to
+                    ; repeat it deadlocks the handshake until the pairing
+                    ; timeout. The BONDING guard prevents a BLE request from
+                    ; clobbering an in-progress ESP-NOW bond's MAC.
+                    (if (or (= pairing-state PAIR_STATE_INITIATED) (and (= pairing-state PAIR_STATE_BONDING) (not (is-valid-espnow-mac pubmote-remote-mac)))) {
+                        (setq pubmote-remote-mac '(0 0 0 0 0 0)) ; Initialize with dummy all-zeros MAC for BLE
+                        (var tmpbuf (bufcreate 5))
+                        (bufset-u8 tmpbuf 0 REM_PAIR_BOND)
+                        (bufset-i32 tmpbuf 1 (pubmote-get-cfg 'pubmote-secret-code))
+
+                        (print "pubmote-ble-rx: Responding with pairing code over BLE")
+                        (pubmote-send-packet '() tmpbuf t)
+                        (free tmpbuf)
+
+                        (set-pairing-state PAIR_STATE_BONDING)
+                    } {
+                        (print "pubmote-ble-rx: Ignored REM_PAIR_BOND because pairing-state != PAIR_STATE_INITIATED")
+                    })
+                })
+                ; No print for other unmatched packets: a secret-code mismatch
+                ; (remote paired to a different board) arrives at input rate
+                ; and would flood the console
             })
-        )
+            (free payload)
+        })
     })
 })
 @const-end
